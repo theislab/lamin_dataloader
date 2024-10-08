@@ -1,0 +1,16 @@
+name: transformer-io
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge # important to have this before channel defaults
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - numpy
+  - pandas
+  - scikit-learn
+  - tqdm
+  - pytorch
+  # - pytorch-cuda=12.1
+  - scanpy

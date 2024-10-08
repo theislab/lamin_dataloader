@@ -5,11 +5,14 @@ setup(
     version='0.1.0',
     url="https://github.com/theislab/transformer_io",
     license='MIT',
-    description='data io for large models',
+    description='data loader and pre-processing for large-scale transformer models',
     author='Theislab',
     packages=find_packages(),
     install_requires=[
         'lamindb==0.75.0',
+        'pytorch',
+        'numpy',
+        'pandas',
         # List your other project dependencies here
     ],
 )

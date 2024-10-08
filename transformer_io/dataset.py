@@ -1,19 +1,13 @@
 import os
+import numpy as np
+import lamindb as ln
+
 from typing import Dict, List
 from transformer_io.data.utils import normalize
-
-import numpy as np
 from torch.utils.data import Dataset, default_collate
-
 from abc import ABC, abstractmethod
-
-import lamindb as ln
-#todo: no hardcode names
-ln.connect('mojtababahrami/lamindb-storage')
-
 from .mapped_collection import CustomMappedCollection
 
-np.random.seed(42)
 
 
 class Tokenizer(ABC):
