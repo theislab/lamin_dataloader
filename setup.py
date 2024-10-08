@@ -10,9 +10,6 @@ setup(
     packages=find_packages(),
     install_requires=[
         'lamindb==0.75.0',
-        'pytorch',
-        'numpy',
-        'pandas',
         # List your other project dependencies here
     ],
 )
