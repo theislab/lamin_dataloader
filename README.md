@@ -11,7 +11,7 @@ conda env create -f environment.yml
 
 2. Activate the environment:
 ```bash
-conda activate contrastive-transformer
+conda activate transformer-io
 ```
 
 3. Install the package in development mode:
