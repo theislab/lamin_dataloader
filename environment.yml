@@ -12,6 +12,6 @@ dependencies:
   - scikit-learn
   - tqdm
   - pytorch
-  # - pytorch-cuda=12.1
+  - pytorch-cuda=12.1
   - scanpy
   - lightning
