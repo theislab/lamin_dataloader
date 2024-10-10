@@ -20,6 +20,9 @@ class Collection(ABC):
     def __len__(self):
         pass
 
+    # The __getitem__ method must return a Dict containing the dataset_id of 
+    # the sample and the count data in the "X" key and any other obs keys with 
+    # their respective keys like {"X": count_data, "dataset_id": dataset_id, 'cell_type': cell_type}
     @abstractmethod
     def __getitem__(self, idx):
         pass
@@ -146,7 +149,7 @@ class CustomMappedCollection(MappedCollection, Collection):
         """
         from torch.utils.data import get_worker_info
 
-        mapped = get_worker_info().dataset.mc
+        mapped = get_worker_info().dataset.collection
         mapped.parallel = False
         mapped.storages = []
         mapped.conns = []

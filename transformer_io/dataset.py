@@ -51,21 +51,18 @@ class GeneIdTokenizer(Tokenizer):
 
 class TokenizedDataset(Dataset):
 
-    def __init__(self, dataset_path, filenames, tokenizer, n_tokens, obs_keys=[], normalization='log1p', sub_sample_frac=None, var_column=None):
+    def __init__(self, collection, tokenizer, n_tokens, obs_keys=[], normalization='log1p', sub_sample_frac=None, var_column=None):
         super(TokenizedDataset).__init__()
         
-        path_list = [os.path.join(dataset_path, file) for file in filenames]
-            
-        self.collection = CustomMappedCollection(path_list, layers_keys="X", obs_keys=obs_keys, join=None, encode_labels=True, parallel=True)
-        if sub_sample_frac is not None:
-            self.collection.subset_data(sub_sample_frac)
-
-        self.path_list = path_list
-        self.obs_keys = obs_keys
+        self.collection = collection
         self.tokenizer = tokenizer
         self.normalization = normalization
         self.n_tokens = n_tokens
+        self.obs_keys = obs_keys
 
+        if sub_sample_frac is not None:
+            self.collection.subset_data(sub_sample_frac)
+                
         self.tokenized_vars = []
         for i, var_name in enumerate(self.collection.var_list):
             tokenized_var = self.tokenizer.encode(var_name)
@@ -77,9 +74,10 @@ class TokenizedDataset(Dataset):
             assert any(mask), f'dataset {self.path_list[i]} has no token in common with vocabulary.'
             self.masks.append(mask)
         
-        if len(self.masks) < 5:
-            for i in range(len(self.masks)):
-                print(f'Dataset {filenames[i]}: {self.masks[i].sum()} / {len(self.masks[i])} tokens')
+        
+        for i in range(len(self.masks)):
+            print(f'Dataset {i}: {self.masks[i].sum()} / {len(self.masks[i])} tokens')
+
         coverage = []
         for i in range(len(self.masks)):
             coverage.append(self.masks[i].sum() / len(self.masks[i]))
