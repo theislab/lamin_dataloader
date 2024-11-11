@@ -4,14 +4,46 @@ from numpy.random import choice
 from lamindb.core import MappedCollection
 from lamindb.core._mapped_collection import _Connect
 from lamindb.core.storage._anndata_accessor import _safer_read_index
+from abc import ABC, abstractmethod
 
 
-class CustomMappedCollection(MappedCollection):
+class Collection(ABC):
+    """
+    An abstract class for mapped collections.
+    """
+    
+    @abstractmethod
+    def __init__(self):
+        pass
+    
+    @abstractmethod
+    def __len__(self):
+        pass
+
+    # The __getitem__ method must return a Dict containing the dataset_id of 
+    # the sample and the count data in the "X" key and any other obs keys with 
+    # their respective keys like {"X": count_data, "dataset_id": dataset_id, 'cell_type': cell_type}
+    @abstractmethod
+    def __getitem__(self, idx):
+        pass
+    
+    @abstractmethod
+    def subset_data(self, sub_sample_frac):
+        pass
+    
+    @property
+    @abstractmethod
+    def var_list(self):
+        pass
+
+
+class CustomMappedCollection(MappedCollection, Collection):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._validate_data()
-        self._make_var_list(var_column=None) # var_column does not work for now
+        self.var_column = None
+        
         
     
     def _validate_data(self):
@@ -25,18 +57,20 @@ class CustomMappedCollection(MappedCollection):
                 assert (layer["data"][:10] == np.round(layer["data"][:10])).all(), f'storage {storage} is not raw data.'
         
         
-    def _make_var_list(self, var_column=None):
-        var_list = []
-        for storage in self.storages:
-            with _Connect(storage) as store:
-                if var_column is not None:
-                    array = store['var'][var_column]
-                    if dict(store['var'][var_column].attrs)['encoding-type'] == 'categorical':
-                        array = array['categories'][array['codes']]
-                    var_list.append(np.array([x.decode("utf-8") for x in array]))
-                else:
-                    var_list.append(_safer_read_index(store["var"]))
-        self.var_list = var_list
+    @property
+    def var_list(self):
+        if not hasattr(self, "_var_list"):
+            self._var_list = []
+            for storage in self.storages:
+                with _Connect(storage) as store:
+                    if self.var_column is not None:
+                        array = store['var'][self.var_column]
+                        if dict(store['var'][self.var_column].attrs)['encoding-type'] == 'categorical':
+                            array = array['categories'][array['codes']]
+                        self._var_list.append(np.array([x.decode("utf-8") for x in array]))
+                    else:
+                        self._var_list.append(_safer_read_index(store["var"]))
+        return self._var_list
 
 
     def subset_data(self, sub_sample_frac):
@@ -103,6 +137,7 @@ class CustomMappedCollection(MappedCollection):
                     if label in self.encoders:
                         label_idx = self.encoders[label][label_idx]
                     out[label] = label_idx
+            out['dataset_id'] = out["_store_idx"]
         return out
     
     
@@ -114,7 +149,7 @@ class CustomMappedCollection(MappedCollection):
         """
         from torch.utils.data import get_worker_info
 
-        mapped = get_worker_info().dataset.mc
+        mapped = get_worker_info().dataset.collection
         mapped.parallel = False
         mapped.storages = []
         mapped.conns = []
