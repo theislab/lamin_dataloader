@@ -59,7 +59,8 @@ class TokenizedDataset(Dataset):
         self.obs_keys = obs_keys
 
         if sub_sample_frac is not None:
-            self.collection.subset_data(sub_sample_frac)
+            # self.collection.subset_data(sub_sample_frac)
+            raise NotImplementedError('Subsampling is not implemented yet.')
                 
         self.tokenized_vars = []
         for i, var_name in enumerate(self.collection.var_list):

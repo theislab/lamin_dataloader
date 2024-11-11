@@ -6,6 +6,16 @@ from lamindb.core._mapped_collection import _Connect
 from lamindb.core.storage._anndata_accessor import _safer_read_index
 from abc import ABC, abstractmethod
 
+from lamindb.core.storage._anndata_accessor import (
+    ArrayType,
+    ArrayTypes,
+    GroupType,
+    GroupTypes,
+    StorageType,
+    _safer_read_index,
+    get_spec,
+    registry,
+)
 
 class Collection(ABC):
     """
@@ -26,10 +36,7 @@ class Collection(ABC):
     @abstractmethod
     def __getitem__(self, idx):
         pass
-    
-    @abstractmethod
-    def subset_data(self, sub_sample_frac):
-        pass
+
     
     @property
     @abstractmethod
@@ -40,9 +47,15 @@ class Collection(ABC):
 class MappedCollection(MappedCollectionMain, Collection):
 
     def __init__(self, *args, **kwargs):
+        
+        self.sampling_key = None
+        if 'sampling_key' in kwargs:
+            self.sampling_key = kwargs.pop('sampling_key')
+            
         super().__init__(*args, **kwargs)
         self._validate_data()
         self.var_column = None
+        self._cache_sampling_key(self.sampling_key)
         
         
     
@@ -55,6 +68,12 @@ class MappedCollection(MappedCollectionMain, Collection):
                 
                 # check if it's really raw data: 
                 assert (layer["data"][:10] == np.round(layer["data"][:10])).all(), f'storage {storage} is not raw data.'
+                
+                for col in self.obs_keys:
+                    assert col in store["obs"].keys(), f'{col} is not in obs keys of storage {storage}'
+                
+                if self.sampling_key is not None and self.sampling_key != 'dataset':
+                    assert self.sampling_key in store["obs"].keys(), f'{self.sampling_key} is not in obs keys of storage {storage}'
         
         
     @property
@@ -73,12 +92,12 @@ class MappedCollection(MappedCollectionMain, Collection):
         return self._var_list
 
 
-    def subset_data(self, sub_sample_frac):
-        self.n_obs_list_orig = self.n_obs_list
-        self.n_obs_list = [int(n_obs * sub_sample_frac) for n_obs in self.n_obs_list]
-        self.n_obs = sum(self.n_obs_list)
-        self.indices = np.hstack([choice(np.arange(n_obs_orig), n_obs, replace=False) for n_obs, n_obs_orig in zip(self.n_obs_list, self.n_obs_list_orig)])
-        self.storage_idx = np.repeat(np.arange(len(self.storages)), self.n_obs_list)
+    # def subset_data(self, sub_sample_frac):
+    #     self.n_obs_list_orig = self.n_obs_list
+    #     self.n_obs_list = [int(n_obs * sub_sample_frac) for n_obs in self.n_obs_list]
+    #     self.n_obs = sum(self.n_obs_list)
+    #     self.indices = np.hstack([choice(np.arange(n_obs_orig), n_obs, replace=False) for n_obs, n_obs_orig in zip(self.n_obs_list, self.n_obs_list_orig)])
+    #     self.storage_idx = np.repeat(np.arange(len(self.storages)), self.n_obs_list)
 
 
     def _make_encoders(self, encode_labels: list):
@@ -139,6 +158,32 @@ class MappedCollection(MappedCollectionMain, Collection):
                     out[label] = label_idx
             out['dataset_id'] = out["_store_idx"]
         return out
+    
+
+
+    def _cache_sampling_key(self, sampling_key: list):
+        self._cache_sampling_obs = {}
+        if sampling_key == 'dataset_id':
+            self._cache_sampling_obs['dataset_id'] = [np.repeat(i, n) for i, n in enumerate(self.n_obs_list)]
+        elif sampling_key is not None:
+            self._cache_sampling_obs[sampling_key] = []
+            for storage in self.storages:
+                with _Connect(storage) as store:
+                    values = self._get_obs_values(store, sampling_key)
+                    print(f'storage: {storage}, label: {sampling_key}, values: {np.unique(values)}')
+                    self._cache_sampling_obs[sampling_key].append(np.array(values))
+        
+                    
+
+    def _get_obs_values(self, storage: StorageType, label_key: str):
+        """Get categories."""
+        obs = storage["obs"]  # type: ignore
+        labels = obs[label_key]
+        assert isinstance(labels, GroupTypes), "Only GroupTypes are supported."
+        if "codes" in labels:
+            return labels["codes"]
+        else:
+            raise ValueError(f"Group {label_key} is not categorical.")
     
     
     @staticmethod
