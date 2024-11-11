@@ -1,7 +1,7 @@
 import numpy as np
 from numpy.random import choice
 
-from lamindb.core import MappedCollection
+from lamindb.core import MappedCollection as MappedCollectionMain
 from lamindb.core._mapped_collection import _Connect
 from lamindb.core.storage._anndata_accessor import _safer_read_index
 from abc import ABC, abstractmethod
@@ -37,7 +37,7 @@ class Collection(ABC):
         pass
 
 
-class CustomMappedCollection(MappedCollection, Collection):
+class MappedCollection(MappedCollectionMain, Collection):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
