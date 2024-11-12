@@ -163,8 +163,8 @@ class MappedCollection(MappedCollectionMain, Collection):
 
     def _cache_sampling_key(self, sampling_key: list):
         self._cache_sampling_obs = {}
-        if sampling_key == 'dataset_id':
-            self._cache_sampling_obs['dataset_id'] = [np.repeat(i, n) for i, n in enumerate(self.n_obs_list)]
+        if sampling_key == 'dataset':
+            self._cache_sampling_obs['dataset'] = [np.repeat(i, n) for i, n in enumerate(self.n_obs_list)]
         elif sampling_key is not None:
             self._cache_sampling_obs[sampling_key] = []
             for storage in self.storages:
