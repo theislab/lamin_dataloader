@@ -52,13 +52,17 @@ class MappedCollectionDataModule(L.LightningDataModule):
         batch_size = dataloader_kwargs.pop('batch_size') // num_replicas
         shuffle = dataloader_kwargs.pop('shuffle')
         drop_last = dataloader_kwargs.pop('drop_last')
+        num_samples = dataloader_kwargs.pop('num_samples')
         assert drop_last == True, 'drop_last must be True during training and validation'
         assert shuffle == True, 'shuffle must be True during training and validation'
         
+        if num_samples is not None:
+            assert num_samples < len(dataset), 'num_samples must be less than the number of samples in the dataset'
+
         if sampling_key:
-            sampler = WithinGroupSampler(dataset.collection._cache_sampling_obs[sampling_key], batch_size, num_replicas, shuffle=shuffle, drop_last=drop_last)
+            sampler = WithinGroupSampler(dataset.collection._cache_sampling_obs[sampling_key], batch_size * num_replicas, num_samples, shuffle=shuffle, drop_last=drop_last)
         else:
-            sampler = RandomSampler(dataset)
+            sampler = RandomSampler(dataset, num_samples=num_samples)
             
         if torch.distributed.is_initialized():
             sampler = DistributedSamplerWrapper(sampler, shuffle=False, drop_last=False)
@@ -71,7 +75,7 @@ class MappedCollectionDataModule(L.LightningDataModule):
                                 collate_fn=custom_collate,
                                 **dataloader_kwargs)
         
-        print(f'Creating {stage} dataloader by {len(dataloader)} batches of size {batch_size*num_replicas} over {len(dataset)} samples; num_replicas={num_replicas}; sum of indices: {sum(dataset.collection.indices)}')
+        print(f'Creating {stage} dataloader by {len(dataloader)} batches of size {batch_size*num_replicas} taking {len(dataloader)*batch_size*num_replicas} samples from {len(dataset)} total samples; num_replicas={num_replicas}; sum of indices: {sum(dataset.collection.indices)}')
         return dataloader
         
     def train_dataloader(self):

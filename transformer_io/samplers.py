@@ -8,10 +8,10 @@ np.random.seed(42)
 
         
 class WithinGroupSampler(Sampler):
-    def __init__(self, obs_list, batch_size, num_replicas=1, shuffle=True, drop_last=True):
+    def __init__(self, obs_list, batch_size, num_samples=None, shuffle=True, drop_last=True):
         self.obs_list = obs_list
-        self.num_replicas = num_replicas
-        self.batch_size = batch_size * num_replicas
+        self.batch_size = batch_size
+        self.num_samples = num_samples
         self.shuffle = shuffle
         self.drop_last = drop_last
         self.batches = None
@@ -41,3 +41,5 @@ class WithinGroupSampler(Sampler):
                 self.batches.extend(batches)
             count += n_obs
         shuffle(self.batches)
+        if self.num_samples is not None:
+            self.batches = self.batches[:self.num_samples//self.batch_size]

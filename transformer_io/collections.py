@@ -170,7 +170,7 @@ class MappedCollection(MappedCollectionMain, Collection):
             for storage in self.storages:
                 with _Connect(storage) as store:
                     values = self._get_obs_values(store, sampling_key)
-                    print(f'storage: {storage}, label: {sampling_key}, values: {np.unique(values)}')
+                    # print(f'storage: {storage}, label: {sampling_key}, values: {np.unique(values)}')
                     self._cache_sampling_obs[sampling_key].append(np.array(values))
         
                     
