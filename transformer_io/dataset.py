@@ -135,7 +135,7 @@ class TokenizedDataset(Dataset):
             values_1 = np.pad(values_1, (0, pad_1), mode='constant', constant_values=0)
             tokens_2 = np.pad(tokens_2, (0, pad_2), mode='constant', constant_values=self.tokenizer.PAD_TOKEN)
             values_2 = np.pad(values_2, (0, pad_2), mode='constant', constant_values=0)
-            print(context_size_1, context_size_2, pad_1, pad_2)
+            
         else:
             tokens_1, tokens_2 = tokens_1[:self.max_tokens], tokens_2[:self.max_tokens]
             values_1, values_2 = values_1[:self.max_tokens], values_2[:self.max_tokens]
