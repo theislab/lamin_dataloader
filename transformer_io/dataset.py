@@ -111,16 +111,16 @@ class TokenizedDataset(Dataset):
         
         n_tokens = len(tokens)
         selected_vars = np.random.choice(range(len(tokens)), n_tokens, replace=False)
-        tokens, values = tokens[selected_vars], values[selected_vars]        
+        tokens, values = tokens[selected_vars], values[selected_vars]
         
         tokens_1, tokens_2 = tokens[:n_tokens//2], tokens[n_tokens//2:]
         values_1, values_2 = values[:n_tokens//2], values[n_tokens//2:]
         
         if self.gene_sampling_strategy == 'random-nonzero':
-            nonzero_mask_1 = values > 0
-            nonzero_mask_2 = values > 0
-            tokens_1, values_1 = tokens[nonzero_mask_1], values[nonzero_mask_1]
-            tokens_2, values_2 = tokens[nonzero_mask_2], values[nonzero_mask_2]
+            nonzero_mask_1 = values_1 > 0
+            nonzero_mask_2 = values_2 > 0
+            tokens_1, values_1 = tokens_1[nonzero_mask_1], values_1[nonzero_mask_1]
+            tokens_2, values_2 = tokens_2[nonzero_mask_2], values_2[nonzero_mask_2]
             
             context_size_1 = random.randint(min(len(tokens_1), self.min_tokens), min(len(tokens_1), self.max_tokens))
             context_size_2 = random.randint(min(len(tokens_2), self.min_tokens), min(len(tokens_2), self.max_tokens))
@@ -128,6 +128,8 @@ class TokenizedDataset(Dataset):
             tokens_1, tokens_2 = tokens_1[:context_size_1], tokens_2[:context_size_2]
             values_1, values_2 = values_1[:context_size_1], values_2[:context_size_2]
 
+            assert not np.any(np.isin(tokens_1, tokens_2)), "tokens_1 and tokens_2 should not have shared tokens"
+            
             pad_1 = max(self.max_tokens - context_size_1, 0)
             pad_2 = max(self.max_tokens - context_size_2, 0)
 
