@@ -5,7 +5,7 @@ from typing import Dict, List
 from transformer_io.utils import normalize
 from torch.utils.data import Dataset, default_collate
 from abc import ABC, abstractmethod
-
+import random
 
 
 class Tokenizer(ABC):
@@ -40,23 +40,29 @@ class GeneIdTokenizer(Tokenizer):
         super().__init__(list(gene_mapping.keys()))
         self.gene_mapping = gene_mapping
         self.reverse_mapping = {v: k for k, v in gene_mapping.items()}
+        self.PAD_TOKEN = self.gene_mapping.get('<pad>')
 
     def encode(self, items):
         return np.array([self.gene_mapping.get(item, self.NOT_FOUND) for item in items])
 
     def decode(self, items):
         return np.array([self.reverse_mapping.get(item) for item in items])
+    
 
 class TokenizedDataset(Dataset):
 
-    def __init__(self, collection, tokenizer, n_tokens, obs_keys=[], normalization='log1p', sub_sample_frac=None, var_column=None):
+    def __init__(self, collection, tokenizer, max_tokens, min_tokens=1, obs_keys=[], normalization='log1p', gene_sampling_strategy='random', sub_sample_frac=None, var_column=None):
         super(TokenizedDataset).__init__()
         
         self.collection = collection
         self.tokenizer = tokenizer
         self.normalization = normalization
-        self.n_tokens = n_tokens
+        self.max_tokens = max_tokens
+        self.min_tokens = min_tokens
         self.obs_keys = obs_keys
+        self.gene_sampling_strategy = gene_sampling_strategy
+        assert self.gene_sampling_strategy in ['random', 'random-nonzero'], 'gene_sampling_strategy must be either "random" or "random-nonzero"'
+        
 
         if sub_sample_frac is not None:
             # self.collection.subset_data(sub_sample_frac)
@@ -103,13 +109,41 @@ class TokenizedDataset(Dataset):
         values = normalize(item['X'], self.normalization)
         values = values[mask]
         
-        n_tokens = min(self.n_tokens, len(tokens))
+        n_tokens = len(tokens)
         selected_vars = np.random.choice(range(len(tokens)), n_tokens, replace=False)
-        tokens = tokens[selected_vars]
-        values = values[selected_vars]
+        tokens, values = tokens[selected_vars], values[selected_vars]        
+        
+        tokens_1, tokens_2 = tokens[:n_tokens//2], tokens[n_tokens//2:]
+        values_1, values_2 = values[:n_tokens//2], values[n_tokens//2:]
+        
+        if self.gene_sampling_strategy == 'random-nonzero':
+            nonzero_mask_1 = values > 0
+            nonzero_mask_2 = values > 0
+            tokens_1, values_1 = tokens[nonzero_mask_1], values[nonzero_mask_1]
+            tokens_2, values_2 = tokens[nonzero_mask_2], values[nonzero_mask_2]
+            
+            context_size_1 = random.randint(min(len(tokens_1), self.min_tokens), min(len(tokens_1), self.max_tokens))
+            context_size_2 = random.randint(min(len(tokens_2), self.min_tokens), min(len(tokens_2), self.max_tokens))
+            
+            tokens_1, tokens_2 = tokens_1[:context_size_1], tokens_2[:context_size_2]
+            values_1, values_2 = values_1[:context_size_1], values_2[:context_size_2]
 
-        return {'tokens': tokens,
-                'values': values,
+            pad_1 = max(self.max_tokens - context_size_1, 0)
+            pad_2 = max(self.max_tokens - context_size_2, 0)
+
+            tokens_1 = np.pad(tokens_1, (0, pad_1), mode='constant', constant_values=self.tokenizer.PAD_TOKEN)
+            values_1 = np.pad(values_1, (0, pad_1), mode='constant', constant_values=0)
+            tokens_2 = np.pad(tokens_2, (0, pad_2), mode='constant', constant_values=self.tokenizer.PAD_TOKEN)
+            values_2 = np.pad(values_2, (0, pad_2), mode='constant', constant_values=0)
+            print(context_size_1, context_size_2, pad_1, pad_2)
+        else:
+            tokens_1, tokens_2 = tokens_1[:self.max_tokens], tokens_2[:self.max_tokens]
+            values_1, values_2 = values_1[:self.max_tokens], values_2[:self.max_tokens]
+            
+        return {'tokens_1': tokens_1,
+                'values_1': values_1,
+                'tokens_2': tokens_2,
+                'values_2': values_2,
                 'dataset_id': dataset_id,
                 **{key: item[key] for key in self.obs_keys}
         }
