@@ -20,6 +20,7 @@ class MappedCollectionDataModule(L.LightningDataModule):
         tokenizer: Tokenizer,
         columns: List[str],
         normalization: str = 'log1p',
+        gene_sampling_strategy: str = 'random',
         dataset_kwargs: Dict = {},
         dataloader_kwargs: Dict = {},
     ):
@@ -28,20 +29,28 @@ class MappedCollectionDataModule(L.LightningDataModule):
 
         dataset_kwargs_shared = {'obs_keys': columns,
                                  'tokenizer': tokenizer, 
-                                 'normalization': normalization}
+                                 'normalization': normalization,
+                                 'gene_sampling_strategy': gene_sampling_strategy
+                                 }
 
 
         if 'train' in split and split['train'] is not None and 'train' in dataset_kwargs:
             path_list = [os.path.join(dataset_path, file) for file in split['train']]
             sampling_key = self.dataloader_kwargs['train']['within_group_sampling']
             collection = MappedCollection(path_list, layers_keys="X", obs_keys=columns, sampling_key=sampling_key, join=None, encode_labels=True, parallel=True)
-            self.train_dataset = TokenizedDataset(**{'collection': collection, **dataset_kwargs_shared, **dataset_kwargs['train']})
+            self.train_dataset = TokenizedDataset(**{'collection': collection, 'split_input':True, **dataset_kwargs_shared, **dataset_kwargs['train']})
         
         if 'val' in split and split['val'] is not None and 'val' in dataset_kwargs:
             path_list = [os.path.join(dataset_path, file) for file in split['val']]
             sampling_key = self.dataloader_kwargs['val']['within_group_sampling']
             collection = MappedCollection(path_list, layers_keys="X", obs_keys=columns, sampling_key=sampling_key, join=None, encode_labels=True, parallel=True)
-            self.val_dataset = TokenizedDataset(**{'collection': collection, **dataset_kwargs_shared, **dataset_kwargs['val']})
+            self.val_dataset = TokenizedDataset(**{'collection': collection, 'split_input':True, **dataset_kwargs_shared, **dataset_kwargs['val']})
+
+        if 'test' in split and split['test'] is not None and 'test' in dataset_kwargs:
+            path_list = [os.path.join(dataset_path, file) for file in split['test']]
+            sampling_key = None
+            collection = MappedCollection(path_list, layers_keys="X", obs_keys=columns, sampling_key=sampling_key, join=None, encode_labels=True, parallel=True)
+            self.test_dataset = TokenizedDataset(**{'collection': collection, 'split_input': False, **dataset_kwargs_shared, **dataset_kwargs['test']})
 
 
     def _get_dataloader(self, dataset, dataloader_kwargs, stage):
@@ -86,4 +95,14 @@ class MappedCollectionDataModule(L.LightningDataModule):
     def val_dataloader(self):
         dataloader_kwargs = self.dataloader_kwargs['val']
         dataloader = self._get_dataloader(self.val_dataset, dataloader_kwargs, 'val')
+        return dataloader
+
+        
+    def test_dataloader(self):
+        dataloader_kwargs = self.dataloader_kwargs['test']
+        
+        assert dataloader_kwargs['shuffle'] == False, 'shuffle should be false for test dataloader'
+        assert dataloader_kwargs['drop_last'] == False, 'drop_last should be false for test dataloader'
+        dataloader = DataLoader(self.test_dataset, worker_init_fn=self.test_dataset.collection.torch_worker_init_fn, collate_fn=custom_collate, **dataloader_kwargs)
+        print(f'Creating test dataloader by {len(dataloader)} batches of size {dataloader_kwargs["batch_size"]} over {len(self.test_dataset)} samples; sum of indices: {sum(self.test_dataset.collection.indices)}')
         return dataloader
