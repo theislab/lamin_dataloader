@@ -51,7 +51,7 @@ class GeneIdTokenizer(Tokenizer):
 
 class TokenizedDataset(Dataset):
 
-    def __init__(self, collection, tokenizer, max_tokens, min_tokens=1, obs_keys=[], normalization='log1p', gene_sampling_strategy='random', split_input=True, sub_sample_frac=None, var_column=None):
+    def __init__(self, collection, tokenizer, max_tokens, min_tokens=1, obs_keys=[], normalization='log1p', gene_sampling_strategy='random', split_input=True, variable_size=False, sub_sample_frac=None, var_column=None):
         super(TokenizedDataset).__init__()
         
         self.collection = collection
@@ -63,6 +63,7 @@ class TokenizedDataset(Dataset):
         self.gene_sampling_strategy = gene_sampling_strategy
         assert self.gene_sampling_strategy in ['random', 'random-nonzero'], 'gene_sampling_strategy must be either "random" or "random-nonzero"'
         self.split_input = split_input
+        self.variable_size = variable_size
 
         if sub_sample_frac is not None:
             # self.collection.subset_data(sub_sample_frac)
@@ -118,8 +119,8 @@ class TokenizedDataset(Dataset):
             values_1, values_2 = values[:n_tokens//2], values[n_tokens//2:]
         
             if self.gene_sampling_strategy == 'random-nonzero':
-                tokens_1, values_1 = self.nonzero_sampling_prep(tokens_1, values_1, variable_context_size=True)
-                tokens_2, values_2 = self.nonzero_sampling_prep(tokens_2, values_2, variable_context_size=True)
+                tokens_1, values_1 = self.nonzero_sampling_prep(tokens_1, values_1, variable_context_size=self.variable_size)
+                tokens_2, values_2 = self.nonzero_sampling_prep(tokens_2, values_2, variable_context_size=self.variable_size)
                 assert not len(np.intersect1d(tokens_1, tokens_2))>1, 'tokens_1 and tokens_2 should not have more than one token (pad token) in common'
             else:
                 tokens_1, tokens_2 = tokens_1[:self.max_tokens], tokens_2[:self.max_tokens]
@@ -134,7 +135,7 @@ class TokenizedDataset(Dataset):
             }
         else:
             if self.gene_sampling_strategy == 'random-nonzero':
-                tokens, values = self.nonzero_sampling_prep(tokens, values, variable_context_size=False)
+                tokens, values = self.nonzero_sampling_prep(tokens, values, variable_context_size=self.variable_size)
                 assert len(tokens) == self.max_tokens
             else:
                 tokens, values = tokens[:self.max_tokens], values[:self.max_tokens]
