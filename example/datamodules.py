@@ -21,6 +21,7 @@ class MappedCollectionDataModule(L.LightningDataModule):
         columns: List[str],
         normalization: str = 'log1p',
         gene_sampling_strategy: str = 'random',
+        model_speed_sanity_check: bool = False,
         dataset_kwargs: Dict = {},
         dataloader_kwargs: Dict = {},
     ):
@@ -30,7 +31,8 @@ class MappedCollectionDataModule(L.LightningDataModule):
         dataset_kwargs_shared = {'obs_keys': columns,
                                  'tokenizer': tokenizer, 
                                  'normalization': normalization,
-                                 'gene_sampling_strategy': gene_sampling_strategy
+                                 'gene_sampling_strategy': gene_sampling_strategy,
+                                 'model_speed_sanity_check': model_speed_sanity_check
                                  }
 
 

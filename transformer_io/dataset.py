@@ -106,12 +106,12 @@ class TokenizedDataset(Dataset):
                         'values_1': np.zeros(self.max_tokens, dtype=float),
                         'tokens_2': np.zeros(self.max_tokens, dtype=int),
                         'values_2': np.zeros(self.max_tokens, dtype=float),
-                        'dataset_id': 0,
+                        'dataset_id': 0, 'donor_id': 0, 'cell_type': 0,
                         }
             else:
                 return {'tokens': np.zeros(self.max_tokens, dtype=int),
                         'values': np.zeros(self.max_tokens, dtype=float),
-                        'dataset_id': 0,
+                        'dataset_id': 0, 'donor_id': 0, 'cell_type': 0,
                         }
         
         item = self.collection[idx]
