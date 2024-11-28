@@ -51,7 +51,7 @@ class GeneIdTokenizer(Tokenizer):
 
 class TokenizedDataset(Dataset):
 
-    def __init__(self, collection, tokenizer, max_tokens, min_tokens=1, obs_keys=[], normalization='log1p', gene_sampling_strategy='random', split_input=True, variable_size=False, sanity_check=False, sub_sample_frac=None, var_column=None):
+    def __init__(self, collection, tokenizer, max_tokens, min_tokens=1, obs_keys=[], normalization='log1p', gene_sampling_strategy='random', split_input=True, variable_size=False, model_speed_sanity_check=False, sub_sample_frac=None, var_column=None):
         super(TokenizedDataset).__init__()
         
         self.collection = collection
@@ -64,7 +64,7 @@ class TokenizedDataset(Dataset):
         assert self.gene_sampling_strategy in ['random', 'random-nonzero'], 'gene_sampling_strategy must be either "random" or "random-nonzero"'
         self.split_input = split_input
         self.variable_size = variable_size
-        self.sanity_check = sanity_check
+        self.model_speed_sanity_check = model_speed_sanity_check
 
         if sub_sample_frac is not None:
             # self.collection.subset_data(sub_sample_frac)
@@ -100,7 +100,7 @@ class TokenizedDataset(Dataset):
         return len(self.collection)
 
     def __getitem__(self, idx):
-        if self.sanity_check:
+        if self.model_speed_sanity_check:
             if self.split_input:
                 return {'tokens_1': np.zeros(self.max_tokens, dtype=int),
                         'values_1': np.zeros(self.max_tokens, dtype=float),
