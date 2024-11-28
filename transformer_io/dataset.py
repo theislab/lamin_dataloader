@@ -51,7 +51,7 @@ class GeneIdTokenizer(Tokenizer):
 
 class TokenizedDataset(Dataset):
 
-    def __init__(self, collection, tokenizer, max_tokens, min_tokens=1, obs_keys=[], normalization='log1p', gene_sampling_strategy='random', split_input=True, variable_size=False, sub_sample_frac=None, var_column=None):
+    def __init__(self, collection, tokenizer, max_tokens, min_tokens=1, obs_keys=[], normalization='log1p', gene_sampling_strategy='random', split_input=True, variable_size=False, sanity_check=False, sub_sample_frac=None, var_column=None):
         super(TokenizedDataset).__init__()
         
         self.collection = collection
@@ -64,6 +64,7 @@ class TokenizedDataset(Dataset):
         assert self.gene_sampling_strategy in ['random', 'random-nonzero'], 'gene_sampling_strategy must be either "random" or "random-nonzero"'
         self.split_input = split_input
         self.variable_size = variable_size
+        self.sanity_check = sanity_check
 
         if sub_sample_frac is not None:
             # self.collection.subset_data(sub_sample_frac)
@@ -75,8 +76,10 @@ class TokenizedDataset(Dataset):
             self.tokenized_vars.append(tokenized_var)
             
         self.masks = []
+        self.tokenized_vars_masked = []
         for i, var_name in enumerate(self.collection.var_list):
             mask = self.tokenized_vars[i] != self.tokenizer.NOT_FOUND
+            self.tokenized_vars_masked.append(self.tokenized_vars[i][mask])
             assert any(mask), f'dataset {self.path_list[i]} has no token in common with vocabulary.'
             self.masks.append(mask)
         
@@ -97,21 +100,34 @@ class TokenizedDataset(Dataset):
         return len(self.collection)
 
     def __getitem__(self, idx):
+        if self.sanity_check:
+            if self.split_input:
+                return {'tokens_1': np.zeros(self.max_tokens, dtype=int),
+                        'values_1': np.zeros(self.max_tokens, dtype=float),
+                        'tokens_2': np.zeros(self.max_tokens, dtype=int),
+                        'values_2': np.zeros(self.max_tokens, dtype=float),
+                        'dataset_id': 0,
+                        }
+            else:
+                return {'tokens': np.zeros(self.max_tokens, dtype=int),
+                        'values': np.zeros(self.max_tokens, dtype=float),
+                        'dataset_id': 0,
+                        }
+        
         item = self.collection[idx]
         dataset_id = item['dataset_id']
         mask = self.masks[dataset_id]
         
-        var_names = self.collection.var_list[dataset_id]
-        var_names = var_names[mask]
+        # var_names = self.collection.var_list[dataset_id]
+        # var_names = var_names[mask]
         
-        tokens = self.tokenized_vars[dataset_id]
-        tokens = tokens[mask]
+        tokens = self.tokenized_vars_masked[dataset_id]
         
         values = normalize(item['X'], self.normalization)
         values = values[mask]
         
         n_tokens = len(tokens)
-        selected_vars = np.random.choice(range(len(tokens)), n_tokens, replace=False)
+        selected_vars = np.random.permutation(n_tokens)
         tokens, values = tokens[selected_vars], values[selected_vars]
         
         if self.split_input:
