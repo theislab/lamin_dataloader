@@ -1,4 +1,4 @@
-This repo is a dataloader tool for training large-scale transformer models using large amount of data distributed on many Anndata h5ad files.
+This repo is a dataloader tool based on LaminDB for training large-scale models using large amount of data distributed on many Anndata h5ad files.
 
 
 Installation
@@ -11,7 +11,7 @@ conda env create -f environment.yml
 
 2. Activate the environment:
 ```bash
-conda activate transformer-io
+conda activate lamin-dataloader
 ```
 
 3. Install the package in development mode:

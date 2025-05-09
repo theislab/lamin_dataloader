@@ -1,4 +1,4 @@
-name: transformer-io
+name: lamin-dataloader
 channels:
   - pytorch
   - nvidia

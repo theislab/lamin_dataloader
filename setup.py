@@ -1,11 +1,11 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='transformer_io',
+    name='lamin_dataloader',
     version='0.1.0',
-    url="https://github.com/theislab/transformer_io",
+    url="https://github.com/theislab/lamin_dataloader",
     license='MIT',
-    description='data loader and pre-processing for large-scale transformer models',
+    description='data loader and pre-processing for large-scale models based on lamindb',
     author='Theislab',
     packages=find_packages(),
     install_requires=[

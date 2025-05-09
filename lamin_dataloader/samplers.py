@@ -8,7 +8,8 @@ np.random.seed(42)
 
         
 class WithinGroupSampler(Sampler):
-    def __init__(self, obs_list, batch_size, num_samples=None, shuffle=True, drop_last=True):
+    def __init__(self, storage_idx, obs_list, batch_size, num_samples=None, shuffle=True, drop_last=True, stage='train'):
+        self.storage_idx = storage_idx
         self.obs_list = obs_list
         self.batch_size = batch_size
         self.num_samples = num_samples
@@ -16,13 +17,21 @@ class WithinGroupSampler(Sampler):
         self.drop_last = drop_last
         self.batches = None
         self._create_batches()
+        self.stage = stage
+        assert stage in ['train', 'val', 'test'], 'stage must be one of "train", "val", "test"'
     
     def __len__(self):
         return sum([len(batch) for batch in self.batches])
 
     def __iter__(self):
-        self._create_batches()
+        if self.stage == 'train':
+            self._create_batches()
         yield from np.hstack(self.batches)
+
+    def _validate_batches(self):
+        storage_idx = self.storage_idx
+        n_invalid_batches = sum([~(storage_idx[batch][0]==storage_idx[batch]).all() for batch in self.batches])
+        assert n_invalid_batches == 0, f'Number of invalid batches: {n_invalid_batches}'        
 
     def _create_batches(self):
         self.batches = []
@@ -43,3 +52,4 @@ class WithinGroupSampler(Sampler):
         shuffle(self.batches)
         if self.num_samples is not None:
             self.batches = self.batches[:self.num_samples//self.batch_size]
+        self._validate_batches()
