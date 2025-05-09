@@ -118,13 +118,10 @@ class CustomCollate:
     def __init__(self, 
                  tokenizer, 
                  max_tokens,
-                 gene_sampling_strategy='random-nonzero',
                  ):
         self.tokenizer = tokenizer
         self.PAD_TOKEN = tokenizer.PAD_TOKEN
         self.max_tokens = max_tokens
-        self.gene_sampling_strategy = gene_sampling_strategy
-        assert self.gene_sampling_strategy in ['random', 'random-nonzero', 'top-nonzero'], 'gene_sampling_strategy must be either "random" or "random-nonzero" or "top-nonzero"'
         
         self._rng = None
     
@@ -137,10 +134,6 @@ class CustomCollate:
     def resize_and_pad(self, item, max_tokens):
         tokens, values = item['tokens'], item['values']
         
-        if self.gene_sampling_strategy == 'top-nonzero':
-            sorted_indices = np.argsort(values)[::-1]
-            tokens, values = tokens[sorted_indices], values[sorted_indices]
-
         context_size = min(len(tokens), max_tokens)
         tokens, values = tokens[:context_size], values[:context_size]
 
