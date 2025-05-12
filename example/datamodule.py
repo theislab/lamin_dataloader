@@ -39,19 +39,20 @@ class MappedCollectionDataModule(L.LightningDataModule):
         if 'train' in split and split['train'] is not None and 'train' in dataset_kwargs:
             path_list = [os.path.join(dataset_path, file) for file in split['train']]
             self.train_collate_fn = self._get_collate_fn(dataset_kwargs['train'])
-            collection = MappedCollection(path_list, layers_keys="X", obs_keys=columns, sampling_key=None, join=None, encode_labels=True, parallel=True)
+            keys_to_cache = list(dataloader_kwargs['train'].get('filter', {}).keys())
+            collection = MappedCollection(path_list, layers_keys="X", obs_keys=columns, keys_to_cache=keys_to_cache, join=None, encode_labels=True, parallel=True)
             self.train_dataset = TokenizedDataset(**{'collection': collection, **dataset_kwargs_shared, **dataset_kwargs['train']})
         
         if 'val' in split and split['val'] is not None and 'val' in dataset_kwargs:
             path_list = [os.path.join(dataset_path, file) for file in split['val']]
             self.val_collate_fn = self._get_collate_fn(dataset_kwargs['val'])
-            collection = MappedCollection(path_list, layers_keys="X", obs_keys=columns, sampling_key=None, join=None, encode_labels=True, parallel=True)
+            collection = MappedCollection(path_list, layers_keys="X", obs_keys=columns, keys_to_cache=None, join=None, encode_labels=True, parallel=True)
             self.val_dataset = TokenizedDataset(**{'collection': collection, **dataset_kwargs_shared, **dataset_kwargs['val']})
             
         if 'test' in split and split['test'] is not None and 'test' in dataset_kwargs:
             path_list = [os.path.join(dataset_path, file) for file in split['test']]
             self.test_collate_fn = self._get_collate_fn(dataset_kwargs['test'], split_input=False)
-            collection = MappedCollection(path_list, layers_keys="X", obs_keys=columns, sampling_key=None, join=None, encode_labels=True, parallel=True)
+            collection = MappedCollection(path_list, layers_keys="X", obs_keys=columns, keys_to_cache=None, join=None, encode_labels=True, parallel=True)
             self.test_dataset = TokenizedDataset(**{'collection': collection, **dataset_kwargs_shared, **dataset_kwargs['test']})
 
         self._val_dataloader = None
@@ -78,17 +79,18 @@ class MappedCollectionDataModule(L.LightningDataModule):
         if num_samples is not None and num_samples >= len(dataset):
             print(f'Warning: num_samples ({num_samples}) is greater than or equal to the number of samples in the dataset ({len(dataset)}).')
 
-        sampler = RandomSampler(dataset, num_samples=num_samples)
-
-        # If you want to filter for specific cell types, you can use SubsetSampler:
-        # pass "cell_type" as sampling_key to MappedCollection above
-        # sampler = SubsetSampler(dataset.collection.storage_idx, 
-        #                         dataset.collection._cache_sampling_obs['cell_type'], 
-        #                         ['neuron', 'ependymal cell'],
-        #                         batch_size * num_replicas, num_samples, 
-        #                         shuffle=shuffle, 
-        #                         drop_last=drop_last, 
-        #                         stage=stage)
+        filter = dataloader_kwargs.pop('filter', {})
+        if filter is None or len(filter) == 0:
+            sampler = RandomSampler(dataset, num_samples=num_samples)
+        else:
+            sampler = SubsetSampler(dataset.collection.storage_idx, 
+                                    {k: dataset.collection._cached_obs[k] for k in filter.keys()}, 
+                                    filter,
+                                    batch_size * num_replicas, 
+                                    num_samples, 
+                                    shuffle=shuffle, 
+                                    drop_last=drop_last, 
+                                    stage=stage)
         
         if torch.distributed.is_initialized():
             sampler = DistributedSamplerWrapper(sampler, shuffle=False, drop_last=False)

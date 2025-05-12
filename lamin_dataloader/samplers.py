@@ -9,10 +9,10 @@ np.random.seed(42)
 
 # Use this sampler to only take the samples are in obs_filter
 class SubsetSampler(Sampler):
-    def __init__(self, storage_idx, obs_list, obs_filter, batch_size, num_samples=None, shuffle=True, drop_last=True, stage='train'):
+    def __init__(self, storage_idx, obs_list_dict, obs_filter_dict, batch_size, num_samples=None, shuffle=True, drop_last=True, stage='train'):
         self.storage_idx = storage_idx
-        self.obs_list = obs_list
-        self.obs_filter = obs_filter
+        self.obs_list_dict = obs_list_dict
+        self.obs_filter_dict = obs_filter_dict
         self.batch_size = batch_size
         self.num_samples = num_samples
         self.shuffle = shuffle
@@ -33,9 +33,17 @@ class SubsetSampler(Sampler):
     def _create_batches(self):
         self.batches = []
         
-        
-        obs = np.concatenate(self.obs_list)
-        indices = np.argwhere(np.isin(obs, self.obs_filter)).squeeze()
+        indices = []
+        filters = self.obs_filter_dict.keys()
+        for filter_key in filters:
+            obs_list = self.obs_list_dict[filter_key]
+            obs_filter = self.obs_filter_dict[filter_key]
+            obs = np.concatenate(obs_list)
+            idx = np.argwhere(np.isin(obs, obs_filter)).squeeze()
+            indices.append(idx)
+        indices = list(set.intersection(*map(set, indices)))
+        if len(indices) == 0:
+            raise ValueError('No samples found in the given filters.')
         
         if self.shuffle:
             indices = choice(indices, len(indices), replace=False)

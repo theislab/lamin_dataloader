@@ -48,14 +48,19 @@ class MappedCollection(MappedCollectionMain, Collection):
 
     def __init__(self, *args, **kwargs):
         
-        self.sampling_key = None
-        if 'sampling_key' in kwargs:
-            self.sampling_key = kwargs.pop('sampling_key')
+        self.keys_to_cache = None
+        if 'keys_to_cache' in kwargs:
+            self.keys_to_cache = kwargs.pop('keys_to_cache')
             
         super().__init__(*args, **kwargs)
         self._validate_data()
         self.var_column = None
-        self._cache_sampling_key(self.sampling_key)
+        
+        self._cached_obs = {}
+        if self.keys_to_cache is not None:
+            for key in self.keys_to_cache:
+                print(f'Caching {key}...')
+                self._cache_key(key)
         
         
     
@@ -72,8 +77,10 @@ class MappedCollection(MappedCollectionMain, Collection):
                 for col in self.obs_keys:
                     assert col in store["obs"].keys(), f'{col} is not in obs keys of storage {storage}'
                 
-                if self.sampling_key is not None and self.sampling_key != 'dataset':
-                    assert self.sampling_key in store["obs"].keys(), f'{self.sampling_key} is not in obs keys of storage {storage}'
+                if self.keys_to_cache is not None:
+                    for key in self.keys_to_cache:
+                        if key != 'dataset':
+                            assert key in store["obs"].keys(), f'{key} is not in obs keys of storage {storage}'
         
         
     @property
@@ -161,17 +168,15 @@ class MappedCollection(MappedCollectionMain, Collection):
     
 
 
-    def _cache_sampling_key(self, sampling_key: list):
-        self._cache_sampling_obs = {}
-        if sampling_key == 'dataset':
-            self._cache_sampling_obs['dataset'] = [np.repeat(i, n) for i, n in enumerate(self.n_obs_list)]
-        elif sampling_key is not None:
-            self._cache_sampling_obs[sampling_key] = []
+    def _cache_key(self, key: list):
+        if key == 'dataset':
+            self._cached_obs['dataset'] = [np.repeat(i, n) for i, n in enumerate(self.n_obs_list)]
+        elif key is not None:
+            self._cached_obs[key] = []
             for storage in self.storages:
                 with _Connect(storage) as store:
-                    values = self._get_obs_values(store, sampling_key)
-                    # print(f'storage: {storage}, label: {sampling_key}, values: {np.unique(values)}')
-                    self._cache_sampling_obs[sampling_key].append(np.array(values))
+                    values = self._get_obs_values(store, key)
+                    self._cached_obs[key].append(np.array(values))
         
                     
 
