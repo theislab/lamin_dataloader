@@ -18,3 +18,5 @@ conda activate lamin-dataloader
 ```bash
 pip install -e .
 ```
+
+4. Setup a lamindb instance [according to the instructions](https://docs.lamin.ai/setup)
