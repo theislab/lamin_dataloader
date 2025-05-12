@@ -181,7 +181,11 @@ class MappedCollection(MappedCollectionMain, Collection):
         labels = obs[label_key]
         assert isinstance(labels, GroupTypes), "Only GroupTypes are supported."
         if "codes" in labels:
-            return labels["codes"]
+            cats = self._get_categories(storage, label_key)
+            labels = [cats[code] for code in labels["codes"]]
+            if isinstance(labels[0], bytes):
+                labels = [l.decode("utf-8") for l in labels]
+            return labels
         else:
             raise ValueError(f"Group {label_key} is not categorical.")
     

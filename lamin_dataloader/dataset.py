@@ -118,11 +118,13 @@ class CustomCollate:
     def __init__(self, 
                  tokenizer, 
                  max_tokens,
+                 gene_sampling_strategy,
                  ):
         self.tokenizer = tokenizer
         self.PAD_TOKEN = tokenizer.PAD_TOKEN
         self.max_tokens = max_tokens
-        
+        self.gene_sampling_strategy = gene_sampling_strategy
+        assert self.gene_sampling_strategy in ['random', 'top']
         self._rng = None
     
     @property
@@ -133,12 +135,16 @@ class CustomCollate:
 
     def resize_and_pad(self, item, max_tokens):
         tokens, values = item['tokens'], item['values']
+
+        if self.gene_sampling_strategy == 'random':
+            permuted_indices = self.rng.permutation(len(tokens))
+            tokens, values = tokens[permuted_indices], values[permuted_indices]
+        elif self.gene_sampling_strategy == 'top':
+            sorted_indices = np.argsort(values)[::-1]
+            tokens, values = tokens[sorted_indices], values[sorted_indices]
         
         context_size = min(len(tokens), max_tokens)
         tokens, values = tokens[:context_size], values[:context_size]
-
-        sorted_indices = np.argsort(values)[::-1]
-        tokens, values = tokens[sorted_indices], values[sorted_indices]
         
         pad = max(max_tokens - context_size, 0)
         tokens = np.pad(tokens, (0, pad), mode='constant', constant_values=self.PAD_TOKEN)
@@ -147,18 +153,12 @@ class CustomCollate:
 
 
     def __call__(self, batch):
-        n_tokens = len(batch[0]['tokens'])
-        permute = self.rng.permutation(n_tokens)
-        batch_ = [{'tokens': item['tokens'][permute], 
-                          'values': item['values'][permute], 
-                          } for item in batch]
         
-                
-        max_lenght = max([len(item['tokens']) for item in batch_])
+        max_lenght = max([len(item['tokens']) for item in batch])
         
-        max_lenght = min(max_lenght, self.max_tokens - 1)
+        max_lenght = min(max_lenght, self.max_tokens)
 
-        batch_ = [self.resize_and_pad(item, max_lenght) for item in batch_]
+        batch_ = [self.resize_and_pad(item, max_lenght) for item in batch]
         
         tokens, values = [item['tokens'] for item in batch_], [item['values'] for item in batch_]
     
