@@ -79,12 +79,16 @@ class MappedCollection(MappedCollectionMain, Collection):
                 
                 if self.keys_to_cache is not None:
                     for key in self.keys_to_cache:
-                        if key != 'dataset':
+                        if key != 'dataset' and key is not None:
                             assert key in store["obs"].keys(), f'{key} is not in obs keys of storage {storage}'
         
         
     @property
     def var_list(self):
+        if self.var_joint is not None:
+            print(f'var_joint: {self.var_joint}')
+            return [self.var_joint for _ in range(len(self.storages))]
+        
         if not hasattr(self, "_var_list"):
             self._var_list = []
             for storage in self.storages:
