@@ -21,7 +21,7 @@ classifiers = [
 readme = "README.md"
 requires-python = ">=3.7"
 dependencies = [
-    "lamindb==0.75.0",
+    "lamindb==1.6.2",
     "pytest>=7.0.0",
     "torch>=2.0.0",
 ]

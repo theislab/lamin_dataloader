@@ -1,9 +1,10 @@
 import numpy as np
 from numpy.random import choice
 
-from lamindb.core import MappedCollection as MappedCollectionMain
+# from lamindb.core import MappedCollection as MappedCollectionMain
+from lamin_dataloader._mapped_collection import MappedCollection as MappedCollectionMain
+
 from lamindb.core._mapped_collection import _Connect
-from lamindb.core.storage._anndata_accessor import _safer_read_index
 from abc import ABC, abstractmethod
 
 from lamindb.core.storage._anndata_accessor import (
@@ -40,7 +41,7 @@ class Collection(ABC):
     
     @property
     @abstractmethod
-    def var_list(self):
+    def output_var_list(self):
         pass
 
 
@@ -56,12 +57,15 @@ class MappedCollection(MappedCollectionMain, Collection):
         self._validate_data()
         self.var_column = None
         
+        # _cached_obs: {key: [np.array of values for each storage]}
         self._cached_obs = {}
         if self.keys_to_cache is not None:
             for key in self.keys_to_cache:
                 print(f'Caching {key}...')
                 self._cache_key(key)
         
+        
+        self._make_join_vars()
         
     
     def _validate_data(self):
@@ -72,7 +76,7 @@ class MappedCollection(MappedCollectionMain, Collection):
                 assert dict(layer.attrs)['encoding-type'] != 'csc_matrix', f'Only csr_matrix is supported for sparse arrays. storage {storage} is not csr_matrix.'
                 
                 # check if it's really raw data: 
-                assert (layer["data"][:10] == np.round(layer["data"][:10])).all(), f'storage {storage} is not raw data.'
+                # assert (layer["data"][:10] == np.round(layer["data"][:10])).all(), f'storage {storage} is not raw data.'
                 
                 for col in self.obs_keys:
                     assert col in store["obs"].keys(), f'{col} is not in obs keys of storage {storage}'
@@ -84,23 +88,15 @@ class MappedCollection(MappedCollectionMain, Collection):
         
         
     @property
-    def var_list(self):
-        if self.var_joint is not None:
+    def output_var_list(self):
+        if self.join_vars is not None:
             print(f'var_joint: {self.var_joint}')
             return [self.var_joint for _ in range(len(self.storages))]
         
-        if not hasattr(self, "_var_list"):
-            self._var_list = []
-            for storage in self.storages:
-                with _Connect(storage) as store:
-                    if self.var_column is not None:
-                        array = store['var'][self.var_column]
-                        if dict(store['var'][self.var_column].attrs)['encoding-type'] == 'categorical':
-                            array = array['categories'][array['codes']]
-                        self._var_list.append(np.array([x.decode("utf-8") for x in array]))
-                    else:
-                        self._var_list.append(_safer_read_index(store["var"]))
-        return self._var_list
+        else:
+            if self.var_list is None:
+                self._read_vars()
+            return self.var_list
 
 
     # def subset_data(self, sub_sample_frac):
@@ -122,7 +118,7 @@ class MappedCollection(MappedCollectionMain, Collection):
             if unknown_label is not None and unknown_label in cats:
                 cats.remove(unknown_label)
                 encoder[unknown_label] = -1
-            cats = sorted(cats) # added
+            cats = sorted(cats) # Added: This is to keep the mapping consistent across differnt runs
             encoder.update({cat: i for i, cat in enumerate(cats)})
             self.encoders[label] = encoder
 
@@ -152,8 +148,9 @@ class MappedCollection(MappedCollectionMain, Collection):
                 )
             if self.obsm_keys is not None:
                 for obsm_key in self.obsm_keys:
-                    lazy_data = store["obsm"][obsm_key]
-                    out[f"obsm_{obsm_key}"] = self._get_data_idx(lazy_data, obs_idx)
+                    if obsm_key in store["obsm"].keys():
+                        lazy_data = store["obsm"][obsm_key]
+                        out[f"obsm_{obsm_key}"] = self._get_data_idx(lazy_data, obs_idx)
             out["_store_idx"] = storage_idx
             if self.obs_keys is not None:
                 for label in self.obs_keys:
@@ -172,31 +169,31 @@ class MappedCollection(MappedCollectionMain, Collection):
     
 
 
-    def _cache_key(self, key: list):
+    def _cache_key(self, key: str):
         if key == 'dataset':
             self._cached_obs['dataset'] = [np.repeat(i, n) for i, n in enumerate(self.n_obs_list)]
         elif key is not None:
             self._cached_obs[key] = []
-            for storage in self.storages:
+            for i, storage in enumerate(self.storages):
                 with _Connect(storage) as store:
-                    values = self._get_obs_values(store, key)
+                    values = self._get_labels(store, key, storage_idx=i)
                     self._cached_obs[key].append(np.array(values))
         
                     
 
-    def _get_obs_values(self, storage: StorageType, label_key: str):
-        """Get categories."""
-        obs = storage["obs"]  # type: ignore
-        labels = obs[label_key]
-        assert isinstance(labels, GroupTypes), "Only GroupTypes are supported."
-        if "codes" in labels:
-            cats = self._get_categories(storage, label_key)
-            labels = [cats[code] for code in labels["codes"]]
-            if isinstance(labels[0], bytes):
-                labels = [l.decode("utf-8") for l in labels]
-            return labels
-        else:
-            raise ValueError(f"Group {label_key} is not categorical.")
+    # def _get_obs_values(self, storage: StorageType, label_key: str):
+    #     """Get categories."""
+    #     obs = storage["obs"]  # type: ignore
+    #     labels = obs[label_key]
+    #     assert isinstance(labels, GroupTypes), "Only GroupTypes are supported."
+    #     if "codes" in labels:
+    #         cats = self._get_categories(storage, label_key)
+    #         labels = [cats[code] for code in labels["codes"]]
+    #         if isinstance(labels[0], bytes):
+    #             labels = [l.decode("utf-8") for l in labels]
+    #         return labels
+    #     else:
+    #         raise ValueError(f"Group {label_key} is not categorical.")
     
     
     @staticmethod
@@ -211,4 +208,4 @@ class MappedCollection(MappedCollectionMain, Collection):
         mapped.parallel = False
         mapped.storages = []
         mapped.conns = []
-        mapped._make_connections(mapped._path_list, parallel=False)
+        mapped._make_connections(mapped.path_list, parallel=False)
