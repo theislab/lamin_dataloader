@@ -196,7 +196,7 @@ class InMemoryTokenizedDataset(Dataset):
         return output
 
 
-class CustomCollate:
+class BaseCollate:
     def __init__(self, 
                  PAD_TOKEN,
                  max_tokens,
@@ -214,30 +214,33 @@ class CustomCollate:
             self._rng = np.random.default_rng(42)
         return self._rng
     
-    def nonzero_sampling(self, item):
+    def select_features(self, item, feature_max_drop_rate=None):
         tokens, values = item['tokens'], item['values']
         if self.gene_sampling_strategy in ['random-nonzero', 'top-nonzero']:
             nonzero_mask = (values > 0) & (~ np.isnan(values))
         elif self.gene_sampling_strategy in ['random', 'top']:
             nonzero_mask = ~ np.isnan(values)
-            
+        if feature_max_drop_rate is not None and feature_max_drop_rate > 0:
+            drop_mask = self.rng.uniform(size=len(tokens)) < self.rng.uniform(0, feature_max_drop_rate)
+            nonzero_mask = nonzero_mask & (~ drop_mask)
+            # print(f'before drop: {(values > 0).sum()}, after drop: {nonzero_mask.sum()}')
         tokens, values = tokens[nonzero_mask], values[nonzero_mask]        
         return {'tokens': tokens, 'values': values}
 
-
     def resize_and_pad(self, item, max_tokens):
         tokens, values = item['tokens'], item['values']
-
         if self.gene_sampling_strategy in ['random', 'random-nonzero']:
             permuted_indices = self.rng.permutation(len(tokens))
             tokens, values = tokens[permuted_indices], values[permuted_indices]
-        elif self.gene_sampling_strategy in ['top', 'top-nonzero']:
+        elif self.gene_sampling_strategy in ['top-nonzero', 'top']:
+            # sorted_indices = np.argsort(values)[::-1]
             sorted_indices = np.lexsort((tokens, -values))
             tokens, values = tokens[sorted_indices], values[sorted_indices]
         
         context_size = min(len(tokens), max_tokens)
         tokens, values = tokens[:context_size], values[:context_size]
         
+        # sorted_indices = np.argsort(values)[::-1]
         sorted_indices = np.lexsort((tokens, -values))
         tokens, values = tokens[sorted_indices], values[sorted_indices]
         
@@ -249,7 +252,7 @@ class CustomCollate:
 
     def __call__(self, batch):
         
-        batch_ = [self.nonzero_sampling(item) for item in batch]
+        batch_ = [self.select_features(item) for item in batch]
         
         max_lenght = max([len(item['tokens']) for item in batch_])
         

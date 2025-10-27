@@ -5,7 +5,7 @@ import torch
 import torch.distributed as dist
 from torch.utils.data import DataLoader, RandomSampler
 from lamin_dataloader.dataset import TokenizedDataset, Tokenizer
-from lamin_dataloader.dataset import CustomCollate
+from lamin_dataloader.dataset import BaseCollate
 from lamin_dataloader.collections import MappedCollection
 from lamin_dataloader.samplers import SubsetSampler
 from lightning.fabric.utilities.distributed import DistributedSamplerWrapper
@@ -58,7 +58,7 @@ class MappedCollectionDataModule(L.LightningDataModule):
         self._val_dataloader = None
     
     def _get_collate_fn(self, dataset_kwargs):
-        return CustomCollate(
+        return BaseCollate(
             tokenizer=self.tokenizer,
             max_tokens=dataset_kwargs.pop('max_tokens'),
             gene_sampling_strategy=self.gene_sampling_strategy,
