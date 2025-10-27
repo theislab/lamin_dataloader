@@ -6,9 +6,45 @@ import numpy as np
 import pandas as pd
 import anndata as ad
 from scipy.sparse import csr_matrix
-from lamin_dataloader.dataset import TokenizedDataset, InMemoryTokenizedDataset, GeneIdTokenizer
+from lamin_dataloader.dataset import TokenizedDataset, GeneIdTokenizer
 from lamin_dataloader.utils import normalize
-from lamin_dataloader.collections import Collection
+from lamin_dataloader.collections import Collection, InMemoryCollection
+
+
+@pytest.fixture
+def mock_anndata():
+    """Fixture that provides a real AnnData instance."""
+    # Set random seed for reproducible tests
+    np.random.seed(42)
+    
+    # Create expression data
+    n_obs, n_vars = 10, 5
+    X = np.random.rand(n_obs, n_vars)
+    
+    # Create variable names
+    var_names = ['gene1', 'gene2', 'gene3', 'gene_not_in_vocab', 'gene4']
+    
+    # Create variable metadata
+    var = pd.DataFrame({
+        'gene_symbol': var_names,
+        'feature_type': ['Gene Expression'] * n_vars
+    })
+    
+    # Create observation metadata
+    obs = pd.DataFrame({
+        'cell_type': ['T_cell'] * n_obs,
+        'batch': ['batch1'] * n_obs
+    })
+    
+    # Create obsm data
+    obsm = {'X_pca': np.random.rand(n_obs, 2)}
+    
+    # Create AnnData object
+    adata = ad.AnnData(X=X, obs=obs, var=var, obsm=obsm)
+    adata.var_names = var_names
+    
+    return adata
+
 
 class MockCollection(Collection):
     """A mock collection class for testing TokenizedDataset functionality."""
@@ -45,6 +81,66 @@ class MockCollection(Collection):
 def mock_collection():
     """Fixture that provides a MockCollection instance."""
     return MockCollection()
+
+
+
+def test_inmemory_collection(mock_anndata):
+    """Test InMemoryCollection with multiple AnnData objects"""
+    # Create two AnnData objects with different data
+    adata_1 = mock_anndata[:10].copy()
+    adata_2 = mock_anndata[:10].copy()
+    adata_2.obs['cell_type'] = 'B_cell'
+    adata_2.obs['batch'] = 'batch2'
+    adata_list = [adata_1, adata_2]
+    n_obs1 = adata_1.n_obs
+    n_obs2 = adata_2.n_obs
+    var_names1 = adata_1.var_names.values
+    var_names2 = adata_2.var_names.values
+    
+    # Create InMemoryCollection
+    collection = InMemoryCollection(
+        adata_list=adata_list,
+        obs_keys=['cell_type', 'batch'],
+        layers_keys=['X'],
+        obsm_keys=['X_pca'],
+        var_column=None  # Use var_names by default
+    )
+    
+    # Test initialization
+    assert len(collection) == n_obs1 + n_obs2
+    assert len(collection.n_obs_list) == 2
+    assert collection.n_obs_list == [n_obs1, n_obs2]
+    
+    # Test output_var_list
+    assert len(collection.output_var_list) == 2
+    assert np.array_equal(collection.output_var_list[0], np.asarray(var_names1))
+    assert np.array_equal(collection.output_var_list[1], np.asarray(var_names2))
+    
+    # Test __getitem__ for first dataset
+    item = collection[0]
+    assert 'X' in item
+    assert 'dataset_id' in item
+    assert 'cell_type' in item
+    assert 'batch' in item
+    assert 'obsm_X_pca' in item
+    assert item['dataset_id'] == 0
+    assert item['cell_type'] == 'T_cell'
+    assert item['batch'] == 'batch1'
+    assert np.array_equal(item['X'], mock_anndata.X[0])
+    
+    # Test __getitem__ for second dataset (idx = 10, first obs of second dataset)
+    item = collection[n_obs1]
+    assert item['dataset_id'] == 1
+    assert item['cell_type'] == 'B_cell'
+    assert item['batch'] == 'batch2'
+    assert np.array_equal(item['X'], mock_anndata.X[0])
+    
+    # Test __getitem__ for last observation
+    item = collection[n_obs1 + n_obs2 - 1]  # Last obs (idx 9 in second dataset)
+    assert item['dataset_id'] == 1
+    assert np.array_equal(item['X'], mock_anndata.X[9])
+    
+
 
 def test_tokenized_dataset_initialization(mock_collection):
     """Test basic TokenizedDataset initialization"""
@@ -98,44 +194,25 @@ def test_tokenized_dataset_initialization(mock_collection):
     assert item['dataset_id'] == expected_dataset_id
 
 
-@pytest.fixture
-def mock_anndata():
-    """Fixture that provides a real AnnData instance."""
-    # Set random seed for reproducible tests
-    np.random.seed(42)
+def test_tokenized_dataset_with_inmemory_collection(mock_anndata):
+    """Test TokenizedDataset with InMemoryCollection"""
+    # Create two AnnData objects with some genes overlapping and some not in vocabulary
+    adata_1 = mock_anndata[:10].copy()
+    adata_2 = mock_anndata[:10].copy()
+    adata_2.obs['cell_type'] = 'B_cell'
+    adata_2.obs['batch'] = 'batch2'
+    adata_list = [adata_1, adata_2]
     
-    # Create expression data
-    n_obs, n_vars = 10, 5
-    X = np.random.rand(n_obs, n_vars)
+    # Create InMemoryCollection
+    collection = InMemoryCollection(
+        adata_list=adata_list,
+        obs_keys=['cell_type', 'batch'],
+        layers_keys=['X'],
+        obsm_keys=['X_pca'],
+        var_column=None
+    )
     
-    # Create variable names
-    var_names = ['gene1', 'gene2', 'gene3', 'gene_not_in_vocab', 'gene4']
-    
-    # Create variable metadata
-    var = pd.DataFrame({
-        'gene_symbol': var_names,
-        'feature_type': ['Gene Expression'] * n_vars
-    })
-    
-    # Create observation metadata
-    obs = pd.DataFrame({
-        'cell_type': ['T_cell'] * n_obs,
-        'batch': ['batch1'] * n_obs
-    })
-    
-    # Create obsm data
-    obsm = {'X_pca': np.random.rand(n_obs, 2)}
-    
-    # Create AnnData object
-    adata = ad.AnnData(X=X, obs=obs, var=var, obsm=obsm)
-    adata.var_names = var_names
-    
-    return adata
-
-
-def test_inmemory_tokenized_dataset_initialization(mock_anndata):
-    """Test basic InMemoryTokenizedDataset initialization"""
-    # Create a simple gene mapping for the tokenizer
+    # Create a tokenizer with some genes from the mock_anndata vocabulary
     gene_mapping = {
         '<pad>': 0,
         '<cls>': 1,
@@ -144,13 +221,11 @@ def test_inmemory_tokenized_dataset_initialization(mock_anndata):
         'gene3': 4,
         'gene4': 5,
     }
-    
-    # Create a tokenizer
     tokenizer = GeneIdTokenizer(gene_mapping)
     
-    # Create an InMemoryTokenizedDataset instance
-    dataset = InMemoryTokenizedDataset(
-        adata=mock_anndata,
+    # Create a TokenizedDataset instance
+    dataset = TokenizedDataset(
+        collection=collection,
         tokenizer=tokenizer,
         obs_keys=['cell_type', 'batch'],
         obsm_key='X_pca',
@@ -159,59 +234,13 @@ def test_inmemory_tokenized_dataset_initialization(mock_anndata):
     
     # Basic assertions
     assert dataset is not None
-    assert isinstance(dataset, InMemoryTokenizedDataset)
+    assert isinstance(dataset, TokenizedDataset)
     
-    # Test that the dataset has expected attributes
-    assert hasattr(dataset, 'adata')
-    assert hasattr(dataset, 'tokenizer')
-    assert hasattr(dataset, 'normalization')
-    assert hasattr(dataset, 'obs_keys')
-    assert hasattr(dataset, 'obsm_key')
-    assert hasattr(dataset, 'var_names')
-    assert hasattr(dataset, 'tokenized_vars')
-    assert hasattr(dataset, 'mask')
-    assert hasattr(dataset, 'tokenized_vars_masked')
+    # Test dataset length (should be total observations from both datasets)
+    assert len(dataset) == 20  # 10 + 10
     
-    # Test dataset length
-    assert len(dataset) == 10
-    
-    # Test that mask is correctly applied (gene_not_in_vocab should be masked out)
-    expected_mask = np.array([True, True, True, False, True])  # gene_not_in_vocab should be False
-    assert np.array_equal(dataset.mask, expected_mask)
-    
-    # Test that tokenized_vars_masked only contains valid tokens
-    assert len(dataset.tokenized_vars_masked) == 4  # 4 valid genes
-    assert all(token != tokenizer.NOT_FOUND for token in dataset.tokenized_vars_masked)
-
-
-def test_inmemory_tokenized_dataset_getitem(mock_anndata):
-    """Test InMemoryTokenizedDataset __getitem__ method"""
-    # Create a simple gene mapping for the tokenizer
-    gene_mapping = {
-        '<pad>': 0,
-        '<cls>': 1,
-        'gene1': 2,
-        'gene2': 3,
-        'gene3': 4,
-        'gene4': 5,
-    }
-    
-    # Create a tokenizer
-    tokenizer = GeneIdTokenizer(gene_mapping)
-    
-    # Create an InMemoryTokenizedDataset instance
-    dataset = InMemoryTokenizedDataset(
-        adata=mock_anndata,
-        tokenizer=tokenizer,
-        obs_keys=['cell_type', 'batch'],
-        obsm_key='X_pca',
-        normalization='log1p'
-    )
-    
-    # Test getting an item
+    # Test getting an item from the first dataset
     item = dataset[0]
-    
-    # Check required keys are present
     assert 'tokens' in item
     assert 'values' in item
     assert 'dataset_id' in item
@@ -219,84 +248,34 @@ def test_inmemory_tokenized_dataset_getitem(mock_anndata):
     assert 'batch' in item
     assert 'X_pca' in item
     
-    # Check data types and shapes
-    assert isinstance(item['tokens'], np.ndarray)
-    assert isinstance(item['values'], np.ndarray)
-    assert item['dataset_id'] == 0  # Always 0 for single dataset
-    assert len(item['tokens']) == 4  # 4 valid genes after masking
-    assert len(item['values']) == 4  # Same length as tokens
-    
-    # Check that values are normalized
-    expected_values = normalize(mock_anndata.X[0], 'log1p')
-    expected_values_masked = expected_values[dataset.mask]
-    assert np.allclose(item['values'], expected_values_masked)
-    
-    # Check that tokens are correct
-    expected_tokens = tokenizer.encode(['gene1', 'gene2', 'gene3', 'gene4'])
-    assert np.array_equal(item['tokens'], expected_tokens)
-    
-    # Check obs data
+    # Check that tokens exclude 'gene_not_in_vocab'
+    assert item['dataset_id'] == 0
+    assert len(item['tokens']) == 4  # gene1, gene2, gene3, gene4 (gene_not_in_vocab excluded)
+    assert len(item['values']) == 4  # Same as tokens after masking
     assert item['cell_type'] == 'T_cell'
     assert item['batch'] == 'batch1'
     
-    # Check obsm data
-    assert np.array_equal(item['X_pca'], mock_anndata.obsm['X_pca'][0])
+    # Verify tokens are correct (should be gene1, gene2, gene3, gene4)
+    expected_tokens = tokenizer.encode(['gene1', 'gene2', 'gene3', 'gene4'])
+    assert np.array_equal(item['tokens'], expected_tokens)
+    
+    # Verify values are normalized and masked correctly
+    expected_values = normalize(mock_anndata.X[0], 'log1p')
+    expected_values_masked = expected_values[dataset.masks[0]]  # Using the mask for dataset 0
+    assert np.allclose(item['values'], expected_values_masked)
+    
+    # Test getting an item from the second dataset (index 10)
+    item = dataset[10]
+    assert item['dataset_id'] == 1
+    assert item['cell_type'] == 'B_cell'
+    assert item['batch'] == 'batch2'
+    assert len(item['tokens']) == 4  # Same genes for second dataset
+    assert np.array_equal(item['tokens'], expected_tokens)
+    
+    # Test masks are computed correctly for both datasets
+    assert len(dataset.masks) == 2
+    assert len(dataset.tokenized_vars_masked) == 2
+    # Both datasets should have the same mask since they have same genes
+    assert np.array_equal(dataset.masks[0], dataset.masks[1])
 
 
-
-def test_inmemory_tokenized_dataset_no_valid_tokens():
-    """Test InMemoryTokenizedDataset when no tokens are found in vocabulary"""
-    # Create AnnData with genes not in vocabulary
-    n_obs, n_vars = 5, 3
-    X = np.random.rand(n_obs, n_vars)
-    var_names = ['unknown_gene1', 'unknown_gene2', 'unknown_gene3']
-    
-    adata = ad.AnnData(X=X)
-    adata.var_names = var_names
-    
-    # Create a tokenizer with different genes
-    gene_mapping = {
-        '<pad>': 0,
-        '<cls>': 1,
-        'gene1': 2,
-        'gene2': 3,
-    }
-    tokenizer = GeneIdTokenizer(gene_mapping)
-    
-    # Test that AssertionError is raised when no tokens are found
-    with pytest.raises(AssertionError, match="No tokens found in common with vocabulary"):
-        InMemoryTokenizedDataset(
-            adata=adata,
-            tokenizer=tokenizer
-        )
-
-
-def test_inmemory_tokenized_dataset_sparse_data():
-    """Test InMemoryTokenizedDataset with sparse data"""
-    # Create AnnData with sparse data
-    n_obs, n_vars = 5, 3
-    X_sparse = csr_matrix(np.random.rand(n_obs, n_vars))
-    var_names = ['gene1', 'gene2', 'gene3']
-    
-    adata = ad.AnnData(X=X_sparse)
-    adata.var_names = var_names
-    
-    gene_mapping = {
-        '<pad>': 0,
-        '<cls>': 1,
-        'gene1': 2,
-        'gene2': 3,
-        'gene3': 4,
-    }
-    tokenizer = GeneIdTokenizer(gene_mapping)
-    
-    dataset = InMemoryTokenizedDataset(
-        adata=adata,
-        tokenizer=tokenizer,
-        normalization='log1p'
-    )
-    
-    # Test that sparse data is handled correctly
-    item = dataset[0]
-    assert isinstance(item['values'], np.ndarray)
-    assert len(item['values']) == 3  # All genes should be valid
