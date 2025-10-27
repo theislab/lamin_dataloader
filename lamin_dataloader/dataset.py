@@ -58,7 +58,6 @@ class TokenizedDataset(Dataset):
                  obs_keys=[], 
                  obsm_key=None,
                  normalization='log1p', 
-                 sub_sample_frac=None, 
                  var_column=None):
         super(TokenizedDataset).__init__()
         
@@ -68,10 +67,6 @@ class TokenizedDataset(Dataset):
         self.obs_keys = obs_keys
         self.obsm_key = obsm_key
 
-        if sub_sample_frac is not None:
-            # self.collection.subset_data(sub_sample_frac)
-            raise NotImplementedError('Subsampling is not implemented yet.')
-                
         self.tokenized_vars = []
         for i, var_name in enumerate(self.collection.output_var_list):
             tokenized_var = self.tokenizer.encode(var_name)
@@ -139,7 +134,6 @@ class InMemoryTokenizedDataset(Dataset):
                  obs_keys=[], 
                  obsm_key=None,
                  normalization='log1p', 
-                 sub_sample_frac=None, 
                  var_column=None):
         super(InMemoryTokenizedDataset).__init__()
         
@@ -148,9 +142,6 @@ class InMemoryTokenizedDataset(Dataset):
         self.normalization = normalization
         self.obs_keys = obs_keys
         self.obsm_key = obsm_key
-
-        if sub_sample_frac is not None:
-            raise NotImplementedError('Subsampling is not implemented yet.')
         
         # Get variable names from the AnnData object
         # Use var_column if specified, otherwise use the index
