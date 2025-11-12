@@ -82,14 +82,15 @@ class TokenizedDataset(Dataset):
         
         
         for i in range(len(self.masks)):
-            print(f'Dataset {i}: {self.masks[i].sum()} / {len(self.masks[i])} tokens')
+            print(f'Dataset {i+1}: {self.masks[i].sum()} / {len(self.masks[i])} tokens')
 
-        coverage = []
-        for i in range(len(self.masks)):
-            coverage.append(self.masks[i].sum() / len(self.masks[i]))
-        print(f'coverage macro: {np.mean(coverage)}')
-        coverage_micro = sum(np.array(coverage) * np.array(self.collection.n_obs_list)/sum(self.collection.n_obs_list))
-        print(f'covarage micro: {coverage_micro}')
+        if os.environ.get("DEBUG", "False").lower() == "true":
+            coverage = []
+            for i in range(len(self.masks)):
+                coverage.append(self.masks[i].sum() / len(self.masks[i]))
+            print(f'coverage macro: {np.mean(coverage)}')
+            coverage_micro = sum(np.array(coverage) * np.array(self.collection.n_obs_list)/sum(self.collection.n_obs_list))
+            print(f'covarage micro: {coverage_micro}')
         
         
     def __len__(self):
