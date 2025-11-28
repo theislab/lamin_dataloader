@@ -141,7 +141,7 @@ class LaminDiskCollection(MappedCollection, Collection):
                     if label in self.encoders:
                         label_idx = self.encoders[label][label_idx]
                     out[label] = label_idx
-            out['dataset_id'] = out["_store_idx"]
+            out['dataset'] = out["_store_idx"]
         return out
     
 

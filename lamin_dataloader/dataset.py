@@ -98,10 +98,10 @@ class TokenizedDataset(Dataset):
 
     def __getitem__(self, idx):
         item = self.collection[idx]
-        dataset_id = item['dataset_id']
-        mask = self.masks[dataset_id]
+        dataset = item['dataset']
+        mask = self.masks[dataset]
                 
-        tokens = self.tokenized_vars_masked[dataset_id]
+        tokens = self.tokenized_vars_masked[dataset]
         
         values = normalize(item['X'], self.normalization)
         values = values[mask]
@@ -109,7 +109,7 @@ class TokenizedDataset(Dataset):
         output = {
             'tokens': tokens,
             'values': values,
-            'dataset_id': dataset_id,
+            'dataset': dataset,
             **{key: item[key] for key in self.obs_keys}
         }
         

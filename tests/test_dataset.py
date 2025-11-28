@@ -60,12 +60,12 @@ class MockCollection(Collection):
     def __getitem__(self, idx):
         if idx < self.n_obs_list[0]:
             return {
-                'dataset_id': 0,
+                'dataset': 0,
                 'X': np.array([1.0, 2.0, 3.0])
             }
         else:
             return {
-                'dataset_id': 1,
+                'dataset': 1,
                 'X': np.array([4.0, 5.0, 6.0])
             }
     
@@ -119,25 +119,25 @@ def test_inmemory_collection(mock_anndata):
     # Test __getitem__ for first dataset
     item = collection[0]
     assert 'X' in item
-    assert 'dataset_id' in item
+    assert 'dataset' in item
     assert 'cell_type' in item
     assert 'batch' in item
     assert 'obsm_X_pca' in item
-    assert item['dataset_id'] == 0
+    assert item['dataset'] == 0
     assert item['cell_type'] == 'T_cell'
     assert item['batch'] == 'batch1'
     assert np.array_equal(item['X'], mock_anndata.X[0])
     
     # Test __getitem__ for second dataset (idx = 10, first obs of second dataset)
     item = collection[n_obs1]
-    assert item['dataset_id'] == 1
+    assert item['dataset'] == 1
     assert item['cell_type'] == 'B_cell'
     assert item['batch'] == 'batch2'
     assert np.array_equal(item['X'], mock_anndata.X[0])
     
     # Test __getitem__ for last observation
     item = collection[n_obs1 + n_obs2 - 1]  # Last obs (idx 9 in second dataset)
-    assert item['dataset_id'] == 1
+    assert item['dataset'] == 1
     assert np.array_equal(item['X'], mock_anndata.X[9])
     
 
@@ -181,17 +181,17 @@ def test_tokenized_dataset_initialization(mock_collection):
     item = dataset[0]
     assert 'tokens' in item
     assert 'values' in item
-    assert 'dataset_id' in item
+    assert 'dataset' in item
     
     # Check if the values returned are correct
     expected_tokens = tokenizer.encode(['gene1', 'gene2'])
     expected_values = normalize(np.array([1.0, 2.0]), 'log1p')
-    expected_dataset_id = 0
+    expected_dataset = 0
     print('item', item)
     
     assert np.array_equal(item['tokens'], expected_tokens)
     assert np.allclose(item['values'], expected_values)
-    assert item['dataset_id'] == expected_dataset_id
+    assert item['dataset'] == expected_dataset
 
 
 def test_tokenized_dataset_with_inmemory_collection(mock_anndata):
@@ -243,13 +243,13 @@ def test_tokenized_dataset_with_inmemory_collection(mock_anndata):
     item = dataset[0]
     assert 'tokens' in item
     assert 'values' in item
-    assert 'dataset_id' in item
+    assert 'dataset' in item
     assert 'cell_type' in item
     assert 'batch' in item
     assert 'X_pca' in item
     
     # Check that tokens exclude 'gene_not_in_vocab'
-    assert item['dataset_id'] == 0
+    assert item['dataset'] == 0
     assert len(item['tokens']) == 4  # gene1, gene2, gene3, gene4 (gene_not_in_vocab excluded)
     assert len(item['values']) == 4  # Same as tokens after masking
     assert item['cell_type'] == 'T_cell'
@@ -266,7 +266,7 @@ def test_tokenized_dataset_with_inmemory_collection(mock_anndata):
     
     # Test getting an item from the second dataset (index 10)
     item = dataset[10]
-    assert item['dataset_id'] == 1
+    assert item['dataset'] == 1
     assert item['cell_type'] == 'B_cell'
     assert item['batch'] == 'batch2'
     assert len(item['tokens']) == 4  # Same genes for second dataset

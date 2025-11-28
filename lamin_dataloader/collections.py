@@ -18,9 +18,9 @@ class Collection(ABC):
     def __len__(self):
         pass
 
-    # The __getitem__ method must return a Dict containing the dataset_id of 
+    # The __getitem__ method must return a Dict containing the dataset of 
     # the sample and the count data in the "X" key and any other obs keys with 
-    # their respective keys like {"X": count_data, "dataset_id": dataset_id, 'cell_type': cell_type}
+    # their respective keys like {"X": count_data, "dataset": dataset, 'cell_type': cell_type}
     @abstractmethod
     def __getitem__(self, idx):
         pass
@@ -97,7 +97,7 @@ class InMemoryCollection(Collection):
         """
         Get a sample from the collection.
         
-        Returns a dict with 'X', 'dataset_id', and any requested obs_keys and obsm_keys.
+        Returns a dict with 'X', 'dataset', and any requested obs_keys and obsm_keys.
         """
         # Get the observation index and storage index
         obs_idx = self.indices[idx]
@@ -132,8 +132,8 @@ class InMemoryCollection(Collection):
             if key in adata.obs.columns:
                 out[key] = adata.obs[key].iloc[obs_idx]
         
-        # Set dataset_id to the storage index
-        out['dataset_id'] = storage_idx
+        # Set dataset to the storage index
+        out['dataset'] = storage_idx
         
         return out
     
