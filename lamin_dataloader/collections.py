@@ -40,7 +40,7 @@ class InMemoryCollection(Collection):
     AnnData objects that are already loaded in memory.
     """
     
-    def __init__(self, adata_list: List[AnnData], obs_keys=[], layers_keys=['X'], obsm_keys=None, var_column=None, keys_to_cache=None):
+    def __init__(self, adata_list: List[AnnData], obs_keys=[], layers_keys=['X'], obsm_keys=None, var_column=None, keys_to_cache=None, uns_keys=[]):
         """
         Initialize the InMemoryCollection.
         
@@ -51,6 +51,7 @@ class InMemoryCollection(Collection):
             obsm_keys: List of obsm keys to extract (default: None)
             var_column: Column name in adata.var to use as variable names (default: None, uses index)
             keys_to_cache: List of obs keys appended for faster access (default: None)
+            uns_keys: List of uns keys to extract (default: [])
         """
         self.adata_list = adata_list
         self.obs_keys = obs_keys
@@ -58,7 +59,8 @@ class InMemoryCollection(Collection):
         self.obsm_keys = obsm_keys
         self.var_column = var_column
         self.keys_to_cache = keys_to_cache
-        
+        self.uns_keys = uns_keys
+
         # Compute n_obs_list for each storage
         self.n_obs_list = [ad.n_obs for ad in self.adata_list]
         self.n_obs = sum(self.n_obs_list)
@@ -134,6 +136,9 @@ class InMemoryCollection(Collection):
         
         # Set dataset to the storage index
         out['dataset'] = storage_idx
+        
+        for key in self.uns_keys:
+            out[key] = adata.uns[key]
         
         return out
     

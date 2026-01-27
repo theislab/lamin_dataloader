@@ -18,6 +18,8 @@ from lamindb.core.storage._anndata_accessor import (
     get_spec,
     registry,
 )
+_decode = np.frompyfunc(lambda x: x.decode("utf-8"), 1, 1)
+
 from lamin_dataloader.collections import Collection
 
 
@@ -26,19 +28,17 @@ class LaminDiskCollection(MappedCollection, Collection):
 
     def __init__(self, *args, **kwargs):
         
-        self.keys_to_cache = None
-        if 'keys_to_cache' in kwargs:
-            self.keys_to_cache = kwargs.pop('keys_to_cache')
+
+        self.keys_to_cache = kwargs.pop('keys_to_cache', None)        
+        self.uns_keys = kwargs.pop('uns_keys', [])
             
         super().__init__(*args, **kwargs)
         self._validate_data()
-        self.var_column = None
         
         # _cached_obs: {key: [np.array of values for each storage]}
         self._cached_obs = {}
         if self.keys_to_cache is not None:
             for key in self.keys_to_cache:
-                print(f'Caching {key}...')
                 self._cache_key(key)
         
         
@@ -67,7 +67,7 @@ class LaminDiskCollection(MappedCollection, Collection):
     @property
     def output_var_list(self):
         if self.join_vars is not None:
-            print(f'var_joint: {self.var_joint}')
+            print(f'Using var_joint of length: {len(self.var_joint)}')
             return [self.var_joint for _ in range(len(self.storages))]
         
         else:
@@ -75,13 +75,6 @@ class LaminDiskCollection(MappedCollection, Collection):
                 self._read_vars()
             return self.var_list
 
-
-    # def subset_data(self, sub_sample_frac):
-    #     self.n_obs_list_orig = self.n_obs_list
-    #     self.n_obs_list = [int(n_obs * sub_sample_frac) for n_obs in self.n_obs_list]
-    #     self.n_obs = sum(self.n_obs_list)
-    #     self.indices = np.hstack([choice(np.arange(n_obs_orig), n_obs, replace=False) for n_obs, n_obs_orig in zip(self.n_obs_list, self.n_obs_list_orig)])
-    #     self.storage_idx = np.repeat(np.arange(len(self.storages)), self.n_obs_list)
 
 
     def _make_encoders(self, encode_labels: list):
@@ -142,9 +135,22 @@ class LaminDiskCollection(MappedCollection, Collection):
                         label_idx = self.encoders[label][label_idx]
                     out[label] = label_idx
             out['dataset'] = out["_store_idx"]
-        return out
-    
 
+            for key in self.uns_keys:
+                out[key] = self._get_uns_metadata(store, key)
+
+        return out
+
+    def _get_uns_metadata(self, storage: StorageType, key: str):
+        """Get uns metadata from uns."""
+        if key in storage["uns"]:
+            uns_data = storage["uns"][key][...]
+            try:
+                uns_data = _decode(uns_data)
+            except:
+                pass
+            return uns_data
+        return None
 
     def _cache_key(self, key: str):
         if key == 'dataset':
@@ -156,21 +162,6 @@ class LaminDiskCollection(MappedCollection, Collection):
                     values = self._get_labels(store, key, storage_idx=i)
                     self._cached_obs[key].append(np.array(values))
         
-                    
-
-    # def _get_obs_values(self, storage: StorageType, label_key: str):
-    #     """Get categories."""
-    #     obs = storage["obs"]  # type: ignore
-    #     labels = obs[label_key]
-    #     assert isinstance(labels, GroupTypes), "Only GroupTypes are supported."
-    #     if "codes" in labels:
-    #         cats = self._get_categories(storage, label_key)
-    #         labels = [cats[code] for code in labels["codes"]]
-    #         if isinstance(labels[0], bytes):
-    #             labels = [l.decode("utf-8") for l in labels]
-    #         return labels
-    #     else:
-    #         raise ValueError(f"Group {label_key} is not categorical.")
     
     
     @staticmethod

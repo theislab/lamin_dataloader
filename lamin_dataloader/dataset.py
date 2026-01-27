@@ -35,19 +35,25 @@ class GeneIdTokenizer(Tokenizer):
     Args:
         gene_mapping_path (str): The path to the gene mapping pandas.Series file.
     """
-    NOT_FOUND = -1
 
-    def __init__(self, gene_mapping: Dict):
+    def __init__(
+        self, gene_mapping: Dict, CLS_VOCAB: str = "<cls>", PAD_VOCAB: str = "<pad>"
+    ):
         super().__init__(list(gene_mapping.keys()))
         self.gene_mapping = gene_mapping
+        self.CLS_VOCAB = CLS_VOCAB
+        self.PAD_VOCAB = PAD_VOCAB
         self.reverse_mapping = {v: k for k, v in gene_mapping.items()}
-        self.PAD_TOKEN = self.gene_mapping.get('<pad>')
+        self.CLS_TOKEN = self.gene_mapping.get(CLS_VOCAB)
+        self.PAD_TOKEN = self.gene_mapping.get(PAD_VOCAB)
+        self.NOT_FOUND = -1
 
     def encode(self, items):
         return np.array([self.gene_mapping.get(item, self.NOT_FOUND) for item in items])
 
     def decode(self, items):
         return np.array([self.reverse_mapping.get(item) for item in items])
+
     
 
 class TokenizedDataset(Dataset):
@@ -57,8 +63,10 @@ class TokenizedDataset(Dataset):
                  tokenizer, 
                  obs_keys=[], 
                  obsm_key=None,
+                 uns_keys=[],
                  normalization='log1p', 
-                 var_column=None):
+                 **kwargs
+    ):
         super(TokenizedDataset).__init__()
         
         self.collection = collection
@@ -66,6 +74,7 @@ class TokenizedDataset(Dataset):
         self.normalization = normalization
         self.obs_keys = obs_keys
         self.obsm_key = obsm_key
+        self.uns_keys = uns_keys
 
         self.tokenized_vars = []
         for i, var_name in enumerate(self.collection.output_var_list):
@@ -80,17 +89,18 @@ class TokenizedDataset(Dataset):
             assert any(mask), f'dataset {self.collection._path_list[i]} has no token in common with vocabulary.'
             self.masks.append(mask)
         
-        
-        for i in range(len(self.masks)):
-            print(f'Dataset {i+1}: {self.masks[i].sum()} / {len(self.masks[i])} tokens')
+        # for i in range(len(self.masks)):
+            # print(f'Dataset {i+1}: {self.masks[i].sum()} / {len(self.masks[i])} tokens')
 
-        if os.environ.get("DEBUG", "False").lower() == "true":
-            coverage = []
-            for i in range(len(self.masks)):
-                coverage.append(self.masks[i].sum() / len(self.masks[i]))
-            print(f'coverage macro: {np.mean(coverage)}')
-            coverage_micro = sum(np.array(coverage) * np.array(self.collection.n_obs_list)/sum(self.collection.n_obs_list))
-            print(f'covarage micro: {coverage_micro}')
+
+        coverage = []
+        for i in range(len(self.masks)):
+            coverage.append(self.masks[i].sum() / len(self.masks[i]))
+        coverage_micro = sum(np.array(coverage) * np.array(self.collection.n_obs_list)/sum(self.collection.n_obs_list))
+        print(f'Vocabulary coverage macro: {np.mean(coverage)}')
+        print(f'Vocabulary covarage micro: {coverage_micro}')
+        print(f'Vocabulary coverage minimum: {min(coverage)}')
+        print(f'Vocabulary coverage maximum: {max(coverage)}')
         
         
     def __len__(self):
@@ -117,6 +127,9 @@ class TokenizedDataset(Dataset):
         if self.obsm_key is not None and f'obsm_{self.obsm_key}' in item:
             output[self.obsm_key] = item[f'obsm_{self.obsm_key}']
         
+        for key in self.uns_keys:
+            if key in item:
+                output[key] = item[key]
         
         return output
 
