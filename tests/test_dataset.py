@@ -46,7 +46,7 @@ class MockCollection(Collection):
 
     def __init__(self):
         self.var_list = [["gene1", "gene2", "gene_not_in_vocab"], ["gene2", "gene3", "gene_not_in_vocab"]]
-        self._path_list = ["path1", "path2"]
+        self.path_list = ["path1", "path2"]
         self.n_obs_list = [10, 5]
         self.join_vars = None  # Mock join_vars as None to use var_list
 
@@ -63,7 +63,7 @@ class MockCollection(Collection):
     def output_var_list(self):
         """Return the output variable list, mimicking the behavior of MappedCollection."""
         if self.join_vars is not None:
-            return [self.var_joint for _ in range(len(self._path_list))]
+            return [self.var_joint for _ in range(len(self.path_list))]
         else:
             return self.var_list
 

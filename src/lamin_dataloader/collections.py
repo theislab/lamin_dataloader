@@ -83,7 +83,7 @@ class InMemoryCollection(Collection):
                 var_names = ad.var_names.values
             self.var_names_list.append(var_names)
         
-        self._path_list = ['in_memory'] * len(self.adata_list)
+        self.path_list = ['in_memory'] * len(self.adata_list)
         
         # _cached_obs: {key: [np.array of values for each storage]}
         self._cached_obs = {}
