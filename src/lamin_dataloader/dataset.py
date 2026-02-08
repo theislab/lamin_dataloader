@@ -64,7 +64,8 @@ class TokenizedDataset(Dataset):
                  obs_keys=[], 
                  obsm_key=None,
                  uns_keys=[],
-                 normalization='log1p', 
+                 normalization='log1p',
+                 show_coverage=None,
                  **kwargs
     ):
         super(TokenizedDataset).__init__()
@@ -86,21 +87,21 @@ class TokenizedDataset(Dataset):
         for i, var_name in enumerate(self.collection.output_var_list):
             mask = self.tokenized_vars[i] != self.tokenizer.NOT_FOUND
             self.tokenized_vars_masked.append(self.tokenized_vars[i][mask])
-            assert any(mask), f'dataset {self.collection._path_list[i]} has no token in common with vocabulary.'
+            assert any(mask), f'dataset {self.collection.path_list[i]} has no token in common with vocabulary.'
             self.masks.append(mask)
         
-        # for i in range(len(self.masks)):
-            # print(f'Dataset {i+1}: {self.masks[i].sum()} / {len(self.masks[i])} tokens')
+        assert show_coverage in ["verbose", "summary", None], "show_coverage must be one of 'verbose', 'summary', or None"
+        if show_coverage == "verbose":
+            for i in range(len(self.masks)):
+                print(f'Dataset {self.collection.path_list[i]}: {self.masks[i].sum()} / {len(self.masks[i])} tokens detected')
 
-
-        coverage = []
-        for i in range(len(self.masks)):
-            coverage.append(self.masks[i].sum() / len(self.masks[i]))
-        coverage_micro = sum(np.array(coverage) * np.array(self.collection.n_obs_list)/sum(self.collection.n_obs_list))
-        print(f'Vocabulary coverage macro: {np.mean(coverage)}')
-        print(f'Vocabulary covarage micro: {coverage_micro}')
-        print(f'Vocabulary coverage minimum: {min(coverage)}')
-        print(f'Vocabulary coverage maximum: {max(coverage)}')
+        if show_coverage in ["summary", "verbose"]:
+            coverage = []
+            for i in range(len(self.masks)):
+                coverage.append(self.masks[i].sum() / len(self.masks[i]))
+            print(f'Average vocabulary coverage: {np.mean(coverage)*100:.2f}%')
+            print(f'Minimum vocabulary coverage: {min(coverage)*100:.2f}% for dataset: {self.collection.path_list[np.argmin(coverage)]}')
+            print(f'Maximum vocabulary coverage: {max(coverage)*100:.2f}% for dataset: {self.collection.path_list[np.argmax(coverage)]}')
         
         
     def __len__(self):
