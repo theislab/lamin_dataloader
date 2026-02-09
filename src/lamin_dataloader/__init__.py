@@ -1,4 +1,5 @@
 """Lamin DataLoader - A data loading library for AnnData collections."""
+
 from importlib.metadata import version
 
 from lamin_dataloader.collections import Collection, InMemoryCollection

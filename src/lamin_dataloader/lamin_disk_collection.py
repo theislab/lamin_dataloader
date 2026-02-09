@@ -9,73 +9,61 @@ from lamindb.core._mapped_collection import _Connect
 from abc import ABC, abstractmethod
 
 from lamindb.core.storage._anndata_accessor import (
-    ArrayType,
-    ArrayTypes,
-    GroupType,
-    GroupTypes,
     StorageType,
-    _safer_read_index,
-    get_spec,
-    registry,
 )
+
 _decode = np.frompyfunc(lambda x: x.decode("utf-8"), 1, 1)
 
 from lamin_dataloader.collections import Collection
 
 
-
 class LaminDiskCollection(MappedCollection, Collection):
-
     def __init__(self, *args, **kwargs):
-        
 
-        self.keys_to_cache = kwargs.pop('keys_to_cache', None)        
-        self.uns_keys = kwargs.pop('uns_keys', [])
-            
+        self.keys_to_cache = kwargs.pop("keys_to_cache", None)
+        self.uns_keys = kwargs.pop("uns_keys", [])
+
         super().__init__(*args, **kwargs)
         self._validate_data()
-        
+
         # _cached_obs: {key: [np.array of values for each storage]}
         self._cached_obs = {}
         if self.keys_to_cache is not None:
             for key in self.keys_to_cache:
                 self._cache_key(key)
-        
-        
+
         self._make_join_vars()
-        
-    
+
     def _validate_data(self):
         for storage in self.storages:
             with _Connect(storage) as store:
-                layer = store["raw"]["X"] if 'raw' in store.keys() else store["X"]
+                layer = store["raw"]["X"] if "raw" in store.keys() else store["X"]
                 # check if the sparse matrix is csr_matrix:
-                assert dict(layer.attrs)['encoding-type'] != 'csc_matrix', f'Only csr_matrix is supported for sparse arrays. storage {storage} is not csr_matrix.'
-                
-                # check if it's really raw data: 
+                assert dict(layer.attrs)["encoding-type"] != "csc_matrix", (
+                    f"Only csr_matrix is supported for sparse arrays. storage {storage} is not csr_matrix."
+                )
+
+                # check if it's really raw data:
                 # assert (layer["data"][:10] == np.round(layer["data"][:10])).all(), f'storage {storage} is not raw data.'
-                
+
                 for col in self.obs_keys:
-                    assert col in store["obs"].keys(), f'{col} is not in obs keys of storage {storage}'
-                
+                    assert col in store["obs"].keys(), f"{col} is not in obs keys of storage {storage}"
+
                 if self.keys_to_cache is not None:
                     for key in self.keys_to_cache:
-                        if key != 'dataset' and key is not None:
-                            assert key in store["obs"].keys(), f'{key} is not in obs keys of storage {storage}'
-        
-        
+                        if key != "dataset" and key is not None:
+                            assert key in store["obs"].keys(), f"{key} is not in obs keys of storage {storage}"
+
     @property
     def output_var_list(self):
         if self.join_vars is not None:
-            print(f'Using var_joint of length: {len(self.var_joint)}')
+            print(f"Using var_joint of length: {len(self.var_joint)}")
             return [self.var_joint for _ in range(len(self.storages))]
-        
+
         else:
             if self.var_list is None:
                 self._read_vars()
             return self.var_list
-
-
 
     def _make_encoders(self, encode_labels: list):
         for label in encode_labels:
@@ -88,10 +76,9 @@ class LaminDiskCollection(MappedCollection, Collection):
             if unknown_label is not None and unknown_label in cats:
                 cats.remove(unknown_label)
                 encoder[unknown_label] = -1
-            cats = sorted(cats) # Added: This is to keep the mapping consistent across differnt runs
+            cats = sorted(cats)  # Added: This is to keep the mapping consistent across differnt runs
             encoder.update({cat: i for i, cat in enumerate(cats)})
             self.encoders[label] = encoder
-
 
     def __getitem__(self, idx: int):
         obs_idx = self.indices[idx]
@@ -109,13 +96,11 @@ class LaminDiskCollection(MappedCollection, Collection):
                 # )
                 # added:
                 if layers_key == "X":
-                    lazy_data = store["raw"]["X"] if 'raw' in store.keys() else store["X"]
+                    lazy_data = store["raw"]["X"] if "raw" in store.keys() else store["X"]
                 else:
                     lazy_data = store["layers"][layers_key]
-                    
-                out[layers_key] = self._get_data_idx(
-                    lazy_data, obs_idx, self.join_vars, var_idxs_join, self.n_vars
-                )
+
+                out[layers_key] = self._get_data_idx(lazy_data, obs_idx, self.join_vars, var_idxs_join, self.n_vars)
             if self.obsm_keys is not None:
                 for obsm_key in self.obsm_keys:
                     if obsm_key in store["obsm"].keys():
@@ -134,7 +119,7 @@ class LaminDiskCollection(MappedCollection, Collection):
                     if label in self.encoders:
                         label_idx = self.encoders[label][label_idx]
                     out[label] = label_idx
-            out['dataset'] = out["_store_idx"]
+            out["dataset"] = out["_store_idx"]
 
             for key in self.uns_keys:
                 out[key] = self._get_uns_metadata(store, key)
@@ -153,17 +138,15 @@ class LaminDiskCollection(MappedCollection, Collection):
         return None
 
     def _cache_key(self, key: str):
-        if key == 'dataset':
-            self._cached_obs['dataset'] = [np.repeat(i, n) for i, n in enumerate(self.n_obs_list)]
+        if key == "dataset":
+            self._cached_obs["dataset"] = [np.repeat(i, n) for i, n in enumerate(self.n_obs_list)]
         elif key is not None:
             self._cached_obs[key] = []
             for i, storage in enumerate(self.storages):
                 with _Connect(storage) as store:
                     values = self._get_labels(store, key, storage_idx=i)
                     self._cached_obs[key].append(np.array(values))
-        
-    
-    
+
     @staticmethod
     def torch_worker_init_fn(worker_id):
         """`worker_init_fn` for `torch.utils.data.DataLoader`.
