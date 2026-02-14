@@ -112,7 +112,7 @@ class TokenizedDataset(Dataset):
 
     def __getitem__(self, idx):
         item = self.collection[idx]
-        dataset = item["dataset"]
+        dataset = item["_store_idx"]
         mask = self.masks[dataset]
 
         tokens = self.tokenized_vars_masked[dataset]
@@ -120,7 +120,7 @@ class TokenizedDataset(Dataset):
         values = normalize(item["X"], self.normalization)
         values = values[mask]
 
-        output = {"tokens": tokens, "values": values, "dataset": dataset, **{key: item[key] for key in self.obs_keys}}
+        output = {"tokens": tokens, "values": values, **{key: item[key] for key in self.obs_keys}}
 
         if self.obsm_key is not None and f"obsm_{self.obsm_key}" in item:
             output[self.obsm_key] = item[f"obsm_{self.obsm_key}"]

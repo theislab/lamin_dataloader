@@ -42,12 +42,12 @@ class InMemoryCollection(Collection):
     def __init__(
         self,
         adata_list: List[AnnData],
-        obs_keys=[],
+        obs_keys=None,
         layers_keys=["X"],
         obsm_keys=None,
         var_column=None,
         keys_to_cache=None,
-        uns_keys=[],
+        uns_keys=None,
     ):
         """
         Initialize the InMemoryCollection.
@@ -92,6 +92,12 @@ class InMemoryCollection(Collection):
             self.var_names_list.append(var_names)
 
         self.path_list = ["in_memory"] * len(self.adata_list)
+
+        if self.uns_keys is not None:
+            for i, adata in enumerate(self.adata_list):
+                for key in self.uns_keys:
+                    if key not in adata.uns:
+                        raise ValueError(f"adata_list[{i}] is missing '{key}' in uns")
 
         # _cached_obs: {key: [np.array of values for each storage]}
         self._cached_obs = {}
@@ -138,15 +144,18 @@ class InMemoryCollection(Collection):
                     out[f"obsm_{obsm_key}"] = adata.obsm[obsm_key][obs_idx]
 
         # Extract obs data
-        for key in self.obs_keys:
-            if key in adata.obs.columns:
-                out[key] = adata.obs[key].iloc[obs_idx]
+        if self.obs_keys is not None:
+            for key in self.obs_keys:
+                if key in adata.obs.columns:
+                    out[key] = adata.obs[key].iloc[obs_idx]
 
         # Set dataset to the storage index
+        out["_store_idx"] = storage_idx
         out["dataset"] = storage_idx
 
-        for key in self.uns_keys:
-            out[key] = adata.uns[key]
+        if self.uns_keys is not None:
+            for key in self.uns_keys:
+                out[key] = adata.uns[key]
 
         return out
 

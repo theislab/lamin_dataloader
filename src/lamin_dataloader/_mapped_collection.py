@@ -522,6 +522,8 @@ class MappedCollection:
         labels_merge = []
         for i, storage in enumerate(self.storages):
             with _Connect(storage) as store:
+                if label_key not in store["obs"].keys():
+                    continue
                 labels = self._get_labels(store, label_key, storage_idx=i)
                 if self.filtered:
                     labels = labels[self.indices_list[i]]
@@ -533,6 +535,8 @@ class MappedCollection:
         cats_merge = set()
         for i, storage in enumerate(self.storages):
             with _Connect(storage) as store:
+                if label_key not in store["obs"].keys():
+                    continue
                 if label_key in self._cache_cats:
                     cats = self._cache_cats[label_key][i]
                 else:
@@ -562,7 +566,10 @@ class MappedCollection:
                     return cats[label_key]
                 else:
                     return None
-            labels = obs[label_key]
+            if label_key in obs.keys():
+                labels = obs[label_key]
+            else:
+                return None
             if isinstance(labels, GroupTypes):  # type: ignore
                 if "categories" in labels:
                     return labels["categories"]

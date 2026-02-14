@@ -1,16 +1,14 @@
+from logging import getLogger
+
 import numpy as np
-from numpy.random import choice
-from anndata import AnnData
-from typing import List
-
-from lamin_dataloader._mapped_collection import MappedCollection
-
 from lamindb.core._mapped_collection import _Connect
-from abc import ABC, abstractmethod
-
 from lamindb.core.storage._anndata_accessor import (
     StorageType,
 )
+
+from lamin_dataloader._mapped_collection import MappedCollection
+
+logger = getLogger(__name__)
 
 _decode = np.frompyfunc(lambda x: x.decode("utf-8"), 1, 1)
 
@@ -21,7 +19,7 @@ class LaminDiskCollection(MappedCollection, Collection):
     def __init__(self, *args, **kwargs):
 
         self.keys_to_cache = kwargs.pop("keys_to_cache", None)
-        self.uns_keys = kwargs.pop("uns_keys", [])
+        self.uns_keys = kwargs.pop("uns_keys", None)
 
         super().__init__(*args, **kwargs)
         self._validate_data()
@@ -35,8 +33,14 @@ class LaminDiskCollection(MappedCollection, Collection):
         self._make_join_vars()
 
     def _validate_data(self):
+        logger.info("Validating anndata objects...")
         for storage in self.storages:
             with _Connect(storage) as store:
+                if self.uns_keys is not None:
+                    for key in self.uns_keys:
+                        if "uns" not in store or key not in store["uns"]:
+                            raise ValueError(f"Storage {storage} is missing '{key}' in uns")
+
                 layer = store["raw"]["X"] if "raw" in store.keys() else store["X"]
                 # check if the sparse matrix is csr_matrix:
                 assert dict(layer.attrs)["encoding-type"] != "csc_matrix", (
@@ -46,8 +50,8 @@ class LaminDiskCollection(MappedCollection, Collection):
                 # check if it's really raw data:
                 # assert (layer["data"][:10] == np.round(layer["data"][:10])).all(), f'storage {storage} is not raw data.'
 
-                for col in self.obs_keys:
-                    assert col in store["obs"].keys(), f"{col} is not in obs keys of storage {storage}"
+                # for col in self.obs_keys:
+                #     assert col in store["obs"].keys(), f"{col} is not in obs keys of storage {storage}"
 
                 if self.keys_to_cache is not None:
                     for key in self.keys_to_cache:
@@ -109,20 +113,23 @@ class LaminDiskCollection(MappedCollection, Collection):
             out["_store_idx"] = storage_idx
             if self.obs_keys is not None:
                 for label in self.obs_keys:
-                    if label in self._cache_cats:
-                        cats = self._cache_cats[label][storage_idx]
-                        if cats is None:
-                            cats = []
-                    else:
-                        cats = None
-                    label_idx = self._get_obs_idx(store, obs_idx, label, cats)
-                    if label in self.encoders:
-                        label_idx = self.encoders[label][label_idx]
-                    out[label] = label_idx
-            out["dataset"] = out["_store_idx"]
+                    if label == "dataset":
+                        out["dataset"] = storage_idx
+                    elif label in store["obs"].keys():
+                        if label in self._cache_cats:
+                            cats = self._cache_cats[label][storage_idx]
+                            if cats is None:
+                                cats = []
+                        else:
+                            cats = None
+                        label_idx = self._get_obs_idx(store, obs_idx, label, cats)
+                        if label in self.encoders:
+                            label_idx = self.encoders[label][label_idx]
+                        out[label] = label_idx
 
-            for key in self.uns_keys:
-                out[key] = self._get_uns_metadata(store, key)
+            if self.uns_keys is not None:
+                for key in self.uns_keys:
+                    out[key] = self._get_uns_metadata(store, key)
 
         return out
 
@@ -134,6 +141,8 @@ class LaminDiskCollection(MappedCollection, Collection):
                 uns_data = _decode(uns_data)
             except:
                 pass
+            if hasattr(uns_data, "tolist"):  # frompyfunc returns numpy object
+                uns_data = uns_data.tolist()
             return uns_data
         return None
 
@@ -144,8 +153,11 @@ class LaminDiskCollection(MappedCollection, Collection):
             self._cached_obs[key] = []
             for i, storage in enumerate(self.storages):
                 with _Connect(storage) as store:
-                    values = self._get_labels(store, key, storage_idx=i)
-                    self._cached_obs[key].append(np.array(values))
+                    if key in store["obs"].keys():
+                        values = self._get_labels(store, key, storage_idx=i)
+                        self._cached_obs[key].append(np.array(values))
+                    else:
+                        self._cached_obs[key].append(np.full(self.n_obs_list[i], np.nan))
 
     @staticmethod
     def torch_worker_init_fn(worker_id):
