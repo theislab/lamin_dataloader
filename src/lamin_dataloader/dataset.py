@@ -120,7 +120,11 @@ class TokenizedDataset(Dataset):
         values = normalize(item["X"], self.normalization)
         values = values[mask]
 
-        output = {"tokens": tokens, "values": values, **{key: item[key] for key in self.obs_keys}}
+        output = {"tokens": tokens, "values": values}
+
+        for key in self.obs_keys:
+            if key in item:
+                output[key] = item[key]
 
         if self.obsm_key is not None and f"obsm_{self.obsm_key}" in item:
             output[self.obsm_key] = item[f"obsm_{self.obsm_key}"]
