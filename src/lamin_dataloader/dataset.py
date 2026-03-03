@@ -196,7 +196,7 @@ class BaseCollate:
 
         max_lenght = max([len(item["tokens"]) for item in batch_])
 
-        max_lenght = min(max_lenght, self.max_tokens - 1)
+        max_lenght = min(max_lenght, self.max_tokens)
 
         batch_ = [self.resize_and_pad(item, max_lenght) for item in batch_]
 
