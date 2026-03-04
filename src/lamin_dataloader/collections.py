@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
+import os
 import numpy as np
 from numpy.random import choice
+import anndata as ad
 from anndata import AnnData
 from typing import List
 
@@ -61,6 +63,8 @@ class InMemoryCollection(Collection):
             keys_to_cache: List of obs keys appended for faster access (default: None)
             uns_keys: List of uns keys to extract (default: [])
         """
+        if adata_list and isinstance(adata_list[0], (str, os.PathLike)):
+            adata_list = [ad.read_h5ad(path) for path in adata_list]
         self.adata_list = adata_list
         self.obs_keys = obs_keys
         self.layers_keys = layers_keys
@@ -70,7 +74,7 @@ class InMemoryCollection(Collection):
         self.uns_keys = uns_keys
 
         # Compute n_obs_list for each storage
-        self.n_obs_list = [ad.n_obs for ad in self.adata_list]
+        self.n_obs_list = [adata.n_obs for adata in self.adata_list]
         self.n_obs = sum(self.n_obs_list)
 
         # Create indices and storage_idx arrays
@@ -81,14 +85,14 @@ class InMemoryCollection(Collection):
 
         # Get variable names for each storage
         self.var_names_list = []
-        for i, ad in enumerate(self.adata_list):
+        for i, adata in enumerate(self.adata_list):
             if var_column is not None:
-                if var_column in ad.var.columns:
-                    var_names = ad.var[var_column].values
+                if var_column in adata.var.columns:
+                    var_names = adata.var[var_column].values
                 else:
                     raise ValueError(f"Column '{var_column}' not found in adata[{i}].var")
             else:
-                var_names = ad.var_names.values
+                var_names = adata.var_names.values
             self.var_names_list.append(var_names)
 
         self.path_list = ["in_memory"] * len(self.adata_list)
