@@ -72,40 +72,11 @@ class TokenizedDataset(Dataset):
         self.obs_keys = obs_keys
         self.obsm_key = obsm_key
         self.uns_keys = uns_keys
+        self.show_coverage = show_coverage
 
-        self.tokenized_vars = []
-        for i, var_name in enumerate(self.collection.output_var_list):
-            tokenized_var = self.tokenizer.encode(var_name)
-            self.tokenized_vars.append(tokenized_var)
+        self._cache_tokenized_vars()
 
-        self.masks = []
-        self.tokenized_vars_masked = []
-        for i, var_name in enumerate(self.collection.output_var_list):
-            mask = self.tokenized_vars[i] != self.tokenizer.NOT_FOUND
-            self.tokenized_vars_masked.append(self.tokenized_vars[i][mask])
-            assert any(mask), f"dataset {self.collection.path_list[i]} has no token in common with vocabulary."
-            self.masks.append(mask)
-
-        assert show_coverage in ["verbose", "summary", None], (
-            "show_coverage must be one of 'verbose', 'summary', or None"
-        )
-        if show_coverage == "verbose":
-            for i in range(len(self.masks)):
-                print(
-                    f"Dataset {self.collection.path_list[i]}: {self.masks[i].sum()} / {len(self.masks[i])} tokens detected"
-                )
-
-        if show_coverage in ["summary", "verbose"]:
-            coverage = []
-            for i in range(len(self.masks)):
-                coverage.append(self.masks[i].sum() / len(self.masks[i]))
-            print(f"Average vocabulary coverage: {np.mean(coverage) * 100:.2f}%")
-            print(
-                f"Minimum vocabulary coverage: {min(coverage) * 100:.2f}% for dataset: {self.collection.path_list[np.argmin(coverage)]}"
-            )
-            print(
-                f"Maximum vocabulary coverage: {max(coverage) * 100:.2f}% for dataset: {self.collection.path_list[np.argmax(coverage)]}"
-            )
+        self._log_coverage()
 
     def __len__(self):
         return len(self.collection)
@@ -135,6 +106,41 @@ class TokenizedDataset(Dataset):
 
         return output
 
+    def _cache_tokenized_vars(self):
+        self.tokenized_vars = []
+        for i, var_name in enumerate(self.collection.output_var_list):
+            tokenized_var = self.tokenizer.encode(var_name)
+            self.tokenized_vars.append(tokenized_var)
+
+        self.masks = []
+        self.tokenized_vars_masked = []
+        for i, var_name in enumerate(self.collection.output_var_list):
+            mask = self.tokenized_vars[i] != self.tokenizer.NOT_FOUND
+            self.tokenized_vars_masked.append(self.tokenized_vars[i][mask])
+            assert any(mask), f"dataset {self.collection.path_list[i]} has no token in common with vocabulary."
+            self.masks.append(mask)
+
+    def _log_coverage(self):
+        assert self.show_coverage in ["verbose", "summary", None], (
+            "show_coverage must be one of 'verbose', 'summary', or None"
+        )
+        if self.show_coverage == "verbose":
+            for i in range(len(self.masks)):
+                print(
+                    f"Dataset {self.collection.path_list[i]}: {self.masks[i].sum()} / {len(self.masks[i])} tokens detected"
+                )
+
+        if self.show_coverage in ["summary", "verbose"]:
+            coverage = []
+            for i in range(len(self.masks)):
+                coverage.append(self.masks[i].sum() / len(self.masks[i]))
+            print(f"Average vocabulary coverage: {np.mean(coverage) * 100:.2f}%")
+            print(
+                f"Minimum vocabulary coverage: {min(coverage) * 100:.2f}% for dataset: {self.collection.path_list[np.argmin(coverage)]}"
+            )
+            print(
+                f"Maximum vocabulary coverage: {max(coverage) * 100:.2f}% for dataset: {self.collection.path_list[np.argmax(coverage)]}"
+            )
 
 class BaseCollate:
     def __init__(
