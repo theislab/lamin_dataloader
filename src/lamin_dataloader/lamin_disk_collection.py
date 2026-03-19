@@ -61,7 +61,7 @@ class LaminDiskCollection(MappedCollection, Collection):
     @property
     def output_var_list(self):
         if self.join_vars is not None:
-            print(f"Using var_joint of length: {len(self.var_joint)}")
+            logger.info(f"Using var_joint of length: {len(self.var_joint)}")
             return [self.var_joint for _ in range(len(self.storages))]
 
         else:

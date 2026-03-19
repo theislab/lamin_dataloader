@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import logging
 from typing import Dict, List
 
 import numpy as np
@@ -6,6 +7,7 @@ from torch.utils.data import Dataset, default_collate
 
 from lamin_dataloader.utils import normalize
 
+logger = logging.getLogger(__name__)
 
 class Tokenizer(ABC):
     """
@@ -126,7 +128,7 @@ class TokenizedDataset(Dataset):
         )
         if self.show_coverage == "verbose":
             for i in range(len(self.masks)):
-                print(
+                logger.info(
                     f"Dataset {self.collection.path_list[i]}: {self.masks[i].sum()} / {len(self.masks[i])} tokens detected"
                 )
 
@@ -134,11 +136,11 @@ class TokenizedDataset(Dataset):
             coverage = []
             for i in range(len(self.masks)):
                 coverage.append(self.masks[i].sum() / len(self.masks[i]))
-            print(f"Average vocabulary coverage: {np.mean(coverage) * 100:.2f}%")
-            print(
+            logger.info(f"Average vocabulary coverage: {np.mean(coverage) * 100:.2f}%")
+            logger.info(
                 f"Minimum vocabulary coverage: {min(coverage) * 100:.2f}% for dataset: {self.collection.path_list[np.argmin(coverage)]}"
             )
-            print(
+            logger.info(
                 f"Maximum vocabulary coverage: {max(coverage) * 100:.2f}% for dataset: {self.collection.path_list[np.argmax(coverage)]}"
             )
 

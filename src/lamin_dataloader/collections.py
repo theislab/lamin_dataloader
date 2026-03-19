@@ -1,10 +1,13 @@
 from abc import ABC, abstractmethod
+import logging
 import os
+from typing import List
+
 import numpy as np
-from numpy.random import choice
 import anndata as ad
 from anndata import AnnData
-from typing import List
+
+logger = logging.getLogger(__name__)
 
 
 class Collection(ABC):
@@ -107,7 +110,7 @@ class InMemoryCollection(Collection):
         self._cached_obs = {}
         if self.keys_to_cache is not None:
             for key in self.keys_to_cache:
-                print(f"Caching {key}...")
+                logger.info(f"Caching {key}...")
                 self._cache_key(key)
 
     def __len__(self):
