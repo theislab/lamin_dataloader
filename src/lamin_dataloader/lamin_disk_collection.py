@@ -6,7 +6,7 @@ from lamindb.core.storage._anndata_accessor import (
     StorageType,
 )
 
-from lamin_dataloader._mapped_collection import MappedCollection
+from lamindb.core import MappedCollection
 
 logger = getLogger(__name__)
 
@@ -88,9 +88,7 @@ class LaminDiskCollection(MappedCollection, Collection):
         out = super().__getitem__(idx)
         storage_idx = self.storage_idx[idx]
         with _Connect(self.storages[storage_idx]) as store:
-            if self.obs_keys is not None:
-                for label in self.obs_keys:
-                    if label == "dataset":
+            if self.obs_keys is not None and "dataset" in self.obs_keys:
                         out["dataset"] = storage_idx
             if self.uns_keys is not None:
                 for key in self.uns_keys:
