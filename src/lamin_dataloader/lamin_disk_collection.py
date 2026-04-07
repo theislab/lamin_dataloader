@@ -85,53 +85,26 @@ class LaminDiskCollection(MappedCollection, Collection):
             self.encoders[label] = encoder
 
     def __getitem__(self, idx: int):
-        obs_idx = self.indices[idx]
+        out = super().__getitem__(idx)
         storage_idx = self.storage_idx[idx]
-        if self.var_indices is not None:
-            var_idxs_join = self.var_indices[storage_idx]
-        else:
-            var_idxs_join = None
-
         with _Connect(self.storages[storage_idx]) as store:
-            out = {}
-            for layers_key in self.layers_keys:
-                # lazy_data = (
-                #     store["X"] if layers_key == "X" else store["layers"][layers_key]
-                # )
-                # added:
-                if layers_key == "X":
-                    lazy_data = store["raw"]["X"] if "raw" in store.keys() else store["X"]
-                else:
-                    lazy_data = store["layers"][layers_key]
-
-                out[layers_key] = self._get_data_idx(lazy_data, obs_idx, self.join_vars, var_idxs_join, self.n_vars)
-            if self.obsm_keys is not None:
-                for obsm_key in self.obsm_keys:
-                    if obsm_key in store["obsm"].keys():
-                        lazy_data = store["obsm"][obsm_key]
-                        out[f"obsm_{obsm_key}"] = self._get_data_idx(lazy_data, obs_idx)
-            out["_store_idx"] = storage_idx
             if self.obs_keys is not None:
                 for label in self.obs_keys:
                     if label == "dataset":
                         out["dataset"] = storage_idx
-                    elif label in store["obs"].keys():
-                        if label in self._cache_cats:
-                            cats = self._cache_cats[label][storage_idx]
-                            if cats is None:
-                                cats = []
-                        else:
-                            cats = None
-                        label_idx = self._get_obs_idx(store, obs_idx, label, cats)
-                        if label in self.encoders:
-                            label_idx = self.encoders[label][label_idx]
-                        out[label] = label_idx
-
             if self.uns_keys is not None:
                 for key in self.uns_keys:
                     out[key] = self._get_uns_metadata(store, key)
 
         return out
+
+
+    def _get_lazy_data(self, store: StorageType, layers_key: str, storage_idx: int):
+        if layers_key == "X" or layers_key == "raw.X":
+            lazy_data = store["raw"]["X"] if self._cache_has_raw[storage_idx] else store["X"]
+        else:
+            lazy_data = super()._get_lazy_data(store, layers_key, storage_idx)
+        return lazy_data
 
     def _get_uns_metadata(self, storage: StorageType, key: str):
         """Get uns metadata from uns."""
