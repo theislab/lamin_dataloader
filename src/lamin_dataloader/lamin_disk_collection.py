@@ -1,0 +1,145 @@
+from logging import getLogger
+
+import numpy as np
+from lamindb.core._mapped_collection import _Connect
+from lamindb.core.storage._anndata_accessor import (
+    StorageType,
+)
+
+from lamindb.core import MappedCollection
+
+logger = getLogger(__name__)
+
+_decode = np.frompyfunc(lambda x: x.decode("utf-8"), 1, 1)
+
+from lamin_dataloader.collections import Collection
+
+
+class LaminDiskCollection(MappedCollection, Collection):
+    def __init__(self, *args, **kwargs):
+
+        self.keys_to_cache = kwargs.pop("keys_to_cache", None)
+        self.uns_keys = kwargs.pop("uns_keys", None)
+
+        super().__init__(*args, **kwargs)
+        self._validate_data()
+
+        # _cached_obs: {key: [np.array of values for each storage]}
+        self._cached_obs = {}
+        if self.keys_to_cache is not None:
+            for key in self.keys_to_cache:
+                self._cache_key(key)
+
+        self._make_join_vars()
+
+    def _validate_data(self):
+        logger.info("Validating anndata objects...")
+        for storage in self.storages:
+            with _Connect(storage) as store:
+                if self.uns_keys is not None:
+                    for key in self.uns_keys:
+                        if "uns" not in store or key not in store["uns"]:
+                            raise ValueError(f"Storage {storage} is missing '{key}' in uns")
+
+                layer = store["raw"]["X"] if "raw" in store.keys() else store["X"]
+                # check if the sparse matrix is csr_matrix:
+                assert dict(layer.attrs)["encoding-type"] != "csc_matrix", (
+                    f"Only csr_matrix is supported for sparse arrays. storage {storage} is not csr_matrix."
+                )
+
+                # check if it's really raw data:
+                # assert (layer["data"][:10] == np.round(layer["data"][:10])).all(), f'storage {storage} is not raw data.'
+
+                # for col in self.obs_keys:
+                #     assert col in store["obs"].keys(), f"{col} is not in obs keys of storage {storage}"
+
+                if self.keys_to_cache is not None:
+                    for key in self.keys_to_cache:
+                        if key != "dataset" and key is not None:
+                            assert key in store["obs"].keys(), f"{key} is not in obs keys of storage {storage}"
+
+    @property
+    def output_var_list(self):
+        if self.join_vars is not None:
+            logger.info(f"Using var_joint of length: {len(self.var_joint)}")
+            return [self.var_joint for _ in range(len(self.storages))]
+
+        else:
+            if self.var_list is None:
+                self._read_vars()
+            return self.var_list
+
+    def _make_encoders(self, encode_labels: list):
+        for label in encode_labels:
+            cats = self.get_merged_categories(label)
+            encoder = {}
+            if isinstance(self.unknown_label, dict):
+                unknown_label = self.unknown_label.get(label, None)
+            else:
+                unknown_label = self.unknown_label
+            if unknown_label is not None and unknown_label in cats:
+                cats.remove(unknown_label)
+                encoder[unknown_label] = -1
+            cats = sorted(cats)  # Added: This is to keep the mapping consistent across differnt runs
+            encoder.update({cat: i for i, cat in enumerate(cats)})
+            self.encoders[label] = encoder
+
+    def __getitem__(self, idx: int):
+        out = super().__getitem__(idx)
+        storage_idx = self.storage_idx[idx]
+        with _Connect(self.storages[storage_idx]) as store:
+            if self.obs_keys is not None and "dataset" in self.obs_keys:
+                        out["dataset"] = storage_idx
+            if self.uns_keys is not None:
+                for key in self.uns_keys:
+                    out[key] = self._get_uns_metadata(store, key)
+
+        return out
+
+
+    def _get_lazy_data(self, store: StorageType, layers_key: str, storage_idx: int):
+        if layers_key == "X" or layers_key == "raw.X":
+            lazy_data = store["raw"]["X"] if self._cache_has_raw[storage_idx] else store["X"]
+        else:
+            lazy_data = super()._get_lazy_data(store, layers_key, storage_idx)
+        return lazy_data
+
+    def _get_uns_metadata(self, storage: StorageType, key: str):
+        """Get uns metadata from uns."""
+        if key in storage["uns"]:
+            uns_data = storage["uns"][key][...]
+            try:
+                uns_data = _decode(uns_data)
+            except:
+                pass
+            if hasattr(uns_data, "tolist"):  # frompyfunc returns numpy object
+                uns_data = uns_data.tolist()
+            return uns_data
+        return None
+
+    def _cache_key(self, key: str):
+        if key == "dataset":
+            self._cached_obs["dataset"] = [np.repeat(i, n) for i, n in enumerate(self.n_obs_list)]
+        elif key is not None:
+            self._cached_obs[key] = []
+            for i, storage in enumerate(self.storages):
+                with _Connect(storage) as store:
+                    if key in store["obs"].keys():
+                        values = self._get_labels(store, key, storage_idx=i)
+                        self._cached_obs[key].append(np.array(values))
+                    else:
+                        self._cached_obs[key].append(np.full(self.n_obs_list[i], np.nan))
+
+    @staticmethod
+    def torch_worker_init_fn(worker_id):
+        """`worker_init_fn` for `torch.utils.data.DataLoader`.
+
+        Improves performance for `num_workers > 1`.
+        """
+        from torch.utils.data import get_worker_info
+
+        mapped = get_worker_info().dataset.collection
+        mapped.parallel = False
+        mapped.storages = []
+        mapped.conns = []
+        mapped._make_connections(mapped.path_list, parallel=False)

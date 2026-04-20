@@ -1,22 +1,57 @@
-This repo is a dataloader tool based on LaminDB for training large-scale models using large amount of data distributed on many Anndata h5ad files.
+# lamin_dataloader
 
+[![Tests][badge-tests]][tests]
+[![Documentation][badge-docs]][documentation]
 
-Installation
-------------
+[badge-tests]: https://img.shields.io/github/actions/workflow/status/theislab/lamin_dataloader/test.yaml?branch=main
+[badge-docs]: https://img.shields.io/readthedocs/lamin_dataloader
 
-1. Create the conda/mamba environment:
+data loader and pre-processing for large-scale models based on lamindb
+
+## Getting started
+
+Please refer to the [documentation][],
+in particular, the [API documentation][].
+
+## Installation
+
+You need to have Python 3.10 or newer installed on your system.
+If you don't have Python installed, we recommend installing [uv][].
+
+There are several alternative options to install lamin_dataloader:
+
+<!--
+1) Install the latest release of `lamin_dataloader` from [PyPI][]:
+
 ```bash
-conda env create -f environment.yml
+pip install lamin_dataloader
+```
+-->
+
+1. Install the latest development version:
+
+```bash
+pip install git+https://github.com/theislab/lamin_dataloader.git@main
 ```
 
-2. Activate the environment:
-```bash
-conda activate lamin-dataloader
-```
+## Release notes
 
-3. Install the package in development mode:
-```bash
-pip install -e .
-```
+See the [changelog][].
 
-4. Setup a lamindb instance [according to the instructions](https://docs.lamin.ai/setup)
+## Contact
+
+For questions and help requests, you can reach out in the [scverse discourse][].
+If you found a bug, please use the [issue tracker][].
+
+## Citation
+
+> t.b.a
+
+[uv]: https://github.com/astral-sh/uv
+[scverse discourse]: https://discourse.scverse.org/
+[issue tracker]: https://github.com/theislab/lamin_dataloader/issues
+[tests]: https://github.com/theislab/lamin_dataloader/actions/workflows/test.yaml
+[documentation]: https://lamin_dataloader.readthedocs.io
+[changelog]: https://lamin_dataloader.readthedocs.io/en/latest/changelog.html
+[api documentation]: https://lamin_dataloader.readthedocs.io/en/latest/api.html
+[pypi]: https://pypi.org/project/lamin_dataloader
