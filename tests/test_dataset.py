@@ -30,7 +30,7 @@ def test_inmemory_collection(adata):
     # Create InMemoryCollection
     collection = InMemoryCollection(
         adata_list=adata_list,
-        obs_keys=["cell_type", "batch"],
+        obs_keys=["dataset", "cell_type", "batch"],
         layers_keys=["X"],
         obsm_keys=["X_pca"],
         var_column=None,  # Use var_names by default
@@ -88,14 +88,14 @@ def test_tokenized_dataset_with_inmemory_collection(adata, tokenizer):
 
     # Create InMemoryCollection
     collection = InMemoryCollection(
-        adata_list=adata_list, obs_keys=["cell_type", "batch"], layers_keys=["X"], obsm_keys=["X_pca"], var_column=None
+        adata_list=adata_list, obs_keys=["dataset", "cell_type", "batch"], layers_keys=["X"], obsm_keys=["X_pca"], var_column=None
     )
 
     # Create a TokenizedDataset instance
     dataset = TokenizedDataset(
         collection=collection,
         tokenizer=tokenizer,
-        obs_keys=["cell_type", "batch"],
+        obs_keys=["dataset", "cell_type", "batch"],
         obsm_key="X_pca",
         normalization="log1p",
     )
