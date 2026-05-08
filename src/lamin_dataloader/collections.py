@@ -98,7 +98,7 @@ class InMemoryCollection(Collection):
                 var_names = adata.var_names.values
             self.var_names_list.append(var_names)
 
-        self.path_list = ["in_memory"] * len(self.adata_list)
+        self.path_list = [f"{i+1}" for i in range(len(self.adata_list))]
 
         if self.uns_keys is not None:
             for i, adata in enumerate(self.adata_list):

@@ -149,7 +149,7 @@ def test_tokenized_dataset_with_inmemory_collection(adata, tokenizer):
 
 def test_tokenized_dataset_show_coverage_options(adata, tokenizer):
     """Test all supported show_coverage options."""
-    collection = InMemoryCollection(adata_list=[adata[:10].copy(), adata[10:20].copy()], obs_keys=["dataset"], layers_keys=["X"])
+    collection = InMemoryCollection(adata_list=[adata[:, :5].copy(), adata[:, :10].copy()], obs_keys=["dataset"], layers_keys=["X"])
 
     for show_coverage in [None, "summary", "verbose"]:
         dataset = TokenizedDataset(

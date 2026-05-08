@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 import logging
 from typing import Dict, List
-from pathlib import Path
 import numpy as np
 from torch.utils.data import Dataset, default_collate
 
@@ -129,7 +128,7 @@ class TokenizedDataset(Dataset):
         if self.show_coverage == "verbose":
             for i in range(len(self.masks)):
                 logger.info(
-                    f"Dataset {Path(self.collection.path_list[i]).name}: {self.masks[i].sum()} / {len(self.masks[i])} tokens detected"
+                    f"Dataset {self.collection.path_list[i]}: {self.masks[i].sum()} / {len(self.masks[i])} tokens detected"
                 )
 
         elif self.show_coverage == "summary":
