@@ -145,3 +145,18 @@ def test_tokenized_dataset_with_inmemory_collection(adata, tokenizer):
     assert len(dataset.tokenized_vars_masked) == 2
     # Both datasets should have the same mask since they have same genes
     assert np.array_equal(dataset.masks[0], dataset.masks[1])
+
+
+def test_tokenized_dataset_show_coverage_options(adata, tokenizer):
+    """Test all supported show_coverage options."""
+    collection = InMemoryCollection(adata_list=[adata[:10].copy(), adata[10:20].copy()], obs_keys=["dataset"], layers_keys=["X"])
+
+    for show_coverage in [None, "summary", "verbose"]:
+        dataset = TokenizedDataset(
+            collection=collection,
+            tokenizer=tokenizer,
+            obs_keys=["dataset"],
+            normalization="log1p",
+            show_coverage=show_coverage,
+        )
+        assert dataset is not None
