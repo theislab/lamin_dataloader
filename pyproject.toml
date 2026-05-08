@@ -4,7 +4,7 @@ requires = [ "hatchling" ]
 
 [project]
 name = "lamin_dataloader"
-version = "0.2.0"
+version = "0.2.1"
 description = "data loader and pre-processing for large-scale models based on lamindb"
 readme = "README.md"
 license = { file = "LICENSE" }
